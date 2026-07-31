@@ -21,6 +21,21 @@ def create_app():
     def health():
         return {'status': 'ok'}
 
+    @app.route('/api/db-check')
+    def db_check():
+        try:
+            users = mongo.db.users.count_documents({})
+            items = mongo.db.collectionitems.count_documents({})
+            return {
+                'connected': True,
+                'dbName': mongo.db.name,
+                'users': users,
+                'items': items,
+                'adminExists': bool(mongo.db.users.find_one({'email': 'admin@library.edu'}))
+            }
+        except Exception as e:
+            return {'connected': False, 'error': str(e)}
+
     # Serve built frontend in production
     frontend_dist = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'dist')
 
