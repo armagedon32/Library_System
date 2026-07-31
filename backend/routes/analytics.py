@@ -1,0 +1,580 @@
+from flask import Blueprint, request, jsonify, g
+from bson import ObjectId
+from datetime import datetime, timedelta
+import re
+from middleware import token_required, admin_required
+from db import mongo
+from nlp_utils import classify_category, classify_department, run_kmeans, build_document_vectors, cosine_similarity
+
+analytics_bp = Blueprint('analytics', __name__)
+
+
+def item_to_dict(item):
+    item['_id'] = str(item['_id'])
+    for field in ['createdAt', 'acquisitionDate']:
+        if field in item and isinstance(item.get(field), datetime):
+            item[field] = item[field].isoformat()
+    um = item.get('usageMetrics', {})
+    if 'lastUsed' in um and isinstance(um['lastUsed'], datetime):
+        um['lastUsed'] = um['lastUsed'].isoformat()
+    return item
+
+
+@analytics_bp.route('/usage/summary', methods=['GET'])
+@token_required
+def usage_summary():
+    user = g.current_user
+    match = {'isReturned': True}
+    if user.get('role') != 'admin':
+        match['user'] = ObjectId(user['_id'])
+
+    dept = request.args.get('department')
+    cat = request.args.get('category')
+    if dept: match['department'] = dept
+    if cat: match['category'] = {'$regex': cat, '$options': 'i'}
+
+    usage_by_category = list(mongo.db.usagerecords.aggregate([
+        {'$match': match},
+        {'$lookup': {'from': 'collectionitems', 'localField': 'collectionItem', 'foreignField': '_id', 'as': 'item'}},
+        {'$unwind': '$item'},
+        {'$group': {'_id': '$item.category', 'totalBorrows': {'$sum': 1}, 'totalRenewals': {'$sum': '$renewalCount'},
+                     'avgDwellTime': {'$avg': '$dwellTime'}, 'uniqueUsers': {'$addToSet': '$user'}}},
+        {'$project': {'category': '$_id', 'totalBorrows': 1, 'totalRenewals': 1,
+                       'avgDwellTime': {'$round': ['$avgDwellTime', 2]}, 'uniqueUsers': {'$size': '$uniqueUsers'}}}
+    ]))
+
+    usage_by_department = list(mongo.db.usagerecords.aggregate([
+        {'$match': match},
+        {'$group': {'_id': '$department', 'totalBorrows': {'$sum': 1}, 'totalRenewals': {'$sum': '$renewalCount'},
+                     'avgDwellTime': {'$avg': '$dwellTime'}, 'uniqueUsers': {'$addToSet': '$user'}}},
+        {'$project': {'department': '$_id', 'totalBorrows': 1, 'totalRenewals': 1,
+                       'avgDwellTime': {'$round': ['$avgDwellTime', 2]}, 'uniqueUsers': {'$size': '$uniqueUsers'}}}
+    ]))
+
+    top_items = list(mongo.db.usagerecords.aggregate([
+        {'$match': match},
+        {'$lookup': {'from': 'collectionitems', 'localField': 'collectionItem', 'foreignField': '_id', 'as': 'item'}},
+        {'$unwind': '$item'},
+        {'$group': {'_id': '$collectionItem', 'title': {'$first': '$item.title'}, 'author': {'$first': '$item.author'},
+                     'category': {'$first': '$item.category'}, 'borrowCount': {'$sum': 1},
+                     'totalRenewals': {'$sum': '$renewalCount'}, 'avgDwellTime': {'$avg': '$dwellTime'}}},
+        {'$sort': {'borrowCount': -1}}, {'$limit': 10}
+    ]))
+    for t in top_items:
+        t['_id'] = str(t['_id'])
+
+    return jsonify({
+        'usageByCategory': usage_by_category,
+        'usageByDepartment': usage_by_department,
+        'topItems': top_items,
+    })
+
+
+@analytics_bp.route('/usage/my', methods=['GET'])
+@token_required
+def my_usage():
+    user = g.current_user
+    records = list(mongo.db.usagerecords.find({'user': ObjectId(user['_id'])}).sort('borrowDate', -1).limit(20))
+
+    for r in records:
+        r['_id'] = str(r['_id'])
+        if 'collectionItem' in r and isinstance(r['collectionItem'], ObjectId):
+            item = mongo.db.collectionitems.find_one({'_id': r['collectionItem']})
+            if item:
+                r['collectionItem'] = {'_id': str(item['_id']), 'title': item.get('title'), 'author': item.get('author')}
+        for f in ['borrowDate', 'dueDate', 'returnDate']:
+            if f in r and isinstance(r.get(f), datetime):
+                r[f] = r[f].isoformat()
+
+    total = mongo.db.usagerecords.count_documents({'user': ObjectId(user['_id'])})
+    current = mongo.db.usagerecords.count_documents({'user': ObjectId(user['_id']), 'isReturned': False})
+    overdue = mongo.db.usagerecords.count_documents({'user': ObjectId(user['_id']), 'isOverdue': True, 'isReturned': False})
+
+    return jsonify({'records': records, 'stats': {'totalBorrowed': total, 'currentlyBorrowed': current, 'overdueCount': overdue}})
+
+
+@analytics_bp.route('/items', methods=['POST'])
+@admin_required
+def create_item():
+    data = request.get_json()
+    title = data.get('title', '').strip()
+    author = data.get('author', '').strip()
+    isbn = data.get('isbn', '').strip()
+    pub_year = data.get('publishYear')
+
+    if not title or not author or not isbn or not pub_year:
+        return jsonify({'message': 'Missing required fields'}), 400
+    if mongo.db.collectionitems.find_one({'isbn': isbn}):
+        return jsonify({'message': 'Item with this ISBN already exists'}), 400
+    dup = mongo.db.collectionitems.find_one({'title': title, 'author': author})
+    if dup:
+        return jsonify({'message': 'Item with this title and author already exists'}), 400
+
+    desc = data.get('description', '')
+    pub = data.get('publisher', '')
+    category = classify_category(title, desc, pub)
+    department = classify_department(title, desc)
+
+    item = {
+        'title': title, 'author': author, 'isbn': isbn, 'category': category,
+        'department': department, 'description': desc, 'publishYear': int(pub_year),
+        'publisher': pub, 'location': data.get('location', ''),
+        'condition': data.get('condition', 'New'), 'cost': float(data.get('cost', 0)),
+        'copies': int(data.get('copies', 1)), 'status': 'Active', 'cluster': -1,
+        'usageMetrics': {'totalBorrows': 0, 'totalRenewals': 0, 'averageDwellTime': 0, 'usageScore': 0, 'retentionScore': 0},
+        'createdAt': datetime.utcnow()
+    }
+    result = mongo.db.collectionitems.insert_one(item)
+    item['_id'] = result.inserted_id
+    return jsonify(item_to_dict(item)), 201
+
+
+@analytics_bp.route('/items', methods=['GET'])
+@token_required
+def get_items():
+    query = {}
+    search = request.args.get('search', '').strip()
+    if search:
+        escaped = re.escape(search)
+        query['$or'] = [
+            {'title': {'$regex': escaped, '$options': 'i'}},
+            {'author': {'$regex': escaped, '$options': 'i'}}
+        ]
+    for f in ['department', 'status']:
+        v = request.args.get(f)
+        if v: query[f] = v
+    cat = request.args.get('category')
+    if cat: query['category'] = {'$regex': cat, '$options': 'i'}
+    cluster = request.args.get('cluster')
+    if cluster: query['cluster'] = int(cluster)
+
+    page = int(request.args.get('page', 1))
+    limit = int(request.args.get('limit', 20))
+    total = mongo.db.collectionitems.count_documents(query)
+    items = list(mongo.db.collectionitems.find(query).sort('usageMetrics.usageScore', -1).skip((page - 1) * limit).limit(limit))
+
+    return jsonify({'items': [item_to_dict(i) for i in items], 'totalPages': (total + limit - 1) // limit, 'currentPage': page, 'total': total})
+
+
+@analytics_bp.route('/items/download', methods=['GET'])
+@admin_required
+def download_items():
+    import csv, io
+    items = list(mongo.db.collectionitems.find({}).sort('createdAt', -1))
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['Title', 'Author', 'ISBN', 'Category', 'Department', 'Description', 'PublishYear',
+                     'Publisher', 'Location', 'Condition', 'Cost', 'Copies', 'Status',
+                     'TotalBorrows', 'TotalRenewals', 'UsageScore', 'RetentionScore', 'Cluster'])
+    for i in items:
+        m = i.get('usageMetrics', {})
+        writer.writerow([
+            i.get('title', ''), i.get('author', ''), i.get('isbn', ''), i.get('category', ''),
+            i.get('department', ''), i.get('description', ''), i.get('publishYear', ''),
+            i.get('publisher', ''), i.get('location', ''), i.get('condition', ''),
+            i.get('cost', 0), i.get('copies', 0), i.get('status', ''),
+            m.get('totalBorrows', 0), m.get('totalRenewals', 0),
+            m.get('usageScore', 0), m.get('retentionScore', 0), i.get('cluster', -1)
+        ])
+    csv_data = output.getvalue()
+    return jsonify({'csv': csv_data, 'count': len(items)}), 200, {'Content-Type': 'application/json'}
+
+
+@analytics_bp.route('/items/upload', methods=['POST'])
+@admin_required
+def upload_items():
+    import csv, io
+    file = request.files.get('file')
+    if not file:
+        return jsonify({'message': 'No file uploaded'}), 400
+    content = file.read().decode('utf-8-sig')
+    reader = csv.DictReader(io.StringIO(content))
+    required = ['title', 'author']
+    created = 0
+    errors = []
+    for row_num, row in enumerate(reader, start=2):
+        title = row.get('title', '').strip()
+        author = row.get('author', '').strip()
+        if not title or not author:
+            errors.append(f'Row {row_num}: missing title or author')
+            continue
+        if mongo.db.collectionitems.find_one({'title': title, 'author': author}):
+            errors.append(f'Row {row_num}: duplicate "{title}" by {author}')
+            continue
+        if row.get('isbn', '').strip() and mongo.db.collectionitems.find_one({'isbn': row['isbn'].strip()}):
+            errors.append(f'Row {row_num}: duplicate ISBN {row["isbn"].strip()}')
+            continue
+
+        description = row.get('description', '')
+        category = row.get('category', '') or classify_category(title, description, row.get('publisher', ''))
+        department = row.get('department', '') or classify_department(title, description)
+
+        try:
+            cost = float(row.get('cost', 0)) if row.get('cost', '') else 0
+        except: cost = 0
+        try:
+            copies = int(row.get('copies', 1)) if row.get('copies', '') else 1
+        except: copies = 1
+        try:
+            pub_year = int(row.get('publishYear', 2024)) if row.get('publishYear', '') else 2024
+        except: pub_year = 2024
+
+        item = {
+            'title': title, 'author': author, 'isbn': row.get('isbn', '').strip(),
+            'category': category, 'department': department, 'description': description,
+            'publishYear': pub_year, 'publisher': row.get('publisher', '').strip(),
+            'location': row.get('location', '').strip(), 'condition': row.get('condition', 'New').strip(),
+            'cost': cost, 'copies': copies, 'status': 'Active', 'cluster': -1,
+            'usageMetrics': {'totalBorrows': 0, 'totalRenewals': 0, 'averageDwellTime': 0,
+                             'usageScore': 0, 'retentionScore': 0},
+            'createdAt': datetime.utcnow()
+        }
+        mongo.db.collectionitems.insert_one(item)
+        created += 1
+
+    msg = f'{created} items imported successfully'
+    if errors:
+        msg += f' with {len(errors)} errors'
+    return jsonify({'message': msg, 'created': created, 'errors': errors, 'totalErrors': len(errors)})
+
+
+@analytics_bp.route('/items/<item_id>', methods=['GET'])
+@token_required
+def get_item(item_id):
+    item = mongo.db.collectionitems.find_one({'_id': ObjectId(item_id)})
+    if not item: return jsonify({'message': 'Item not found'}), 404
+    usage = list(mongo.db.usagerecords.find({'collectionItem': ObjectId(item_id)}).sort('borrowDate', -1).limit(50))
+    return jsonify({'item': item_to_dict(item), 'usageHistory': [str(u.get('_id')) for u in usage]})
+
+
+@analytics_bp.route('/clustering/run', methods=['POST'])
+@admin_required
+def run_clustering():
+    all_items = list(mongo.db.collectionitems.find({'status': 'Active'}))
+
+    # Separate items with usage data vs new items
+    has_usage = []
+    new_items = []
+    for item in all_items:
+        m = item.get('usageMetrics', {})
+        if m.get('totalBorrows', 0) == 0 and m.get('totalRenewals', 0) == 0 and m.get('averageDwellTime', 0) == 0:
+            new_items.append(item)
+        else:
+            has_usage.append(item)
+
+    # Mark new items as -2
+    for item in new_items:
+        mongo.db.collectionitems.update_one(
+            {'_id': ObjectId(item['_id'])},
+            {'$set': {'cluster': -2}}
+        )
+
+    if len(has_usage) < 3:
+        return jsonify({'message': 'Clustering completed', 'k': 0, 'clusterStats': [],
+                        'newItemsCount': len(new_items)})
+
+    k = max(2, min(5, int(len(has_usage) ** 0.5 // 3 + 1)))
+    clusters = run_kmeans(has_usage, k)
+    if not clusters:
+        return jsonify({'message': 'Clustering failed'}), 500
+
+    for c in clusters:
+        mongo.db.collectionitems.update_one({'_id': ObjectId(c['id'])}, {'$set': {'cluster': c['cluster']}})
+
+    stats = list(mongo.db.collectionitems.aggregate([
+        {'$match': {'cluster': {'$gte': 0}}},
+        {'$group': {'_id': '$cluster', 'count': {'$sum': 1}, 'avgUsageScore': {'$avg': '$usageMetrics.usageScore'},
+                     'avgRetentionScore': {'$avg': '$usageMetrics.retentionScore'}, 'avgBorrows': {'$avg': '$usageMetrics.totalBorrows'}}}
+    ]))
+    return jsonify({'message': 'Clustering completed', 'k': k, 'clusterStats': stats, 'newItemsCount': len(new_items)})
+
+
+@analytics_bp.route('/clustering/results', methods=['GET'])
+@token_required
+def clustering_results():
+    items = list(mongo.db.collectionitems.find({'cluster': {'$gte': -2}}).sort([('cluster', 1), ('usageMetrics.usageScore', -1)]))
+    summary = list(mongo.db.collectionitems.aggregate([
+        {'$match': {'cluster': {'$gte': 0}}},
+        {'$group': {'_id': '$cluster', 'count': {'$sum': 1}, 'avgUsageScore': {'$avg': '$usageMetrics.usageScore'},
+                     'avgRetentionScore': {'$avg': '$usageMetrics.retentionScore'},
+                     'avgBorrows': {'$avg': '$usageMetrics.totalBorrows'}, 'avgDwellTime': {'$avg': '$usageMetrics.averageDwellTime'}}}
+    ]))
+    new_count = mongo.db.collectionitems.count_documents({'cluster': -2})
+    return jsonify({'results': [item_to_dict(i) for i in items], 'summary': summary, 'newItemsCount': new_count})
+
+
+@analytics_bp.route('/recommendations', methods=['GET'])
+@token_required
+def recommendations():
+    r = list(mongo.db.collectionitems.find({'status': 'Recommend Retire'}).sort('usageMetrics.usageScore', 1))
+    k = list(mongo.db.collectionitems.find({'status': 'Recommend Keep'}).sort('usageMetrics.usageScore', -1).limit(20))
+    f = list(mongo.db.collectionitems.find({'status': 'Flagged for Review'}).sort('usageMetrics.usageScore', 1))
+    return jsonify({'retirees': [item_to_dict(i) for i in r], 'keepers': [item_to_dict(i) for i in k], 'flagged': [item_to_dict(i) for i in f]})
+
+
+@analytics_bp.route('/items/<item_id>/status', methods=['PUT'])
+@admin_required
+def update_item_status(item_id):
+    status = request.get_json().get('status')
+    item = mongo.db.collectionitems.find_one_and_update({'_id': ObjectId(item_id)}, {'$set': {'status': status}}, return_document=True)
+    if not item: return jsonify({'message': 'Item not found'}), 404
+    return jsonify(item_to_dict(item))
+
+
+@analytics_bp.route('/items/<item_id>/borrow', methods=['POST'])
+@token_required
+def borrow_item(item_id):
+    user = g.current_user
+    data = request.get_json() or {}
+    item = mongo.db.collectionitems.find_one({'_id': ObjectId(item_id)})
+    if not item:
+        return jsonify({'message': 'Item not found'}), 404
+    if item.get('copies', 0) < 1:
+        return jsonify({'message': 'No available copies'}), 400
+
+    active = mongo.db.usagerecords.count_documents({'collectionItem': ObjectId(item_id), 'isReturned': False})
+    if active >= item.get('copies', 1):
+        return jsonify({'message': 'No available copies'}), 400
+
+    borrow_date = datetime.utcnow()
+    if data.get('borrowDate'):
+        try:
+            borrow_date = datetime.fromisoformat(data['borrowDate'])
+        except: pass
+
+    due_date = borrow_date + timedelta(days=14)
+    if data.get('dueDate'):
+        try:
+            due_date = datetime.fromisoformat(data['dueDate'])
+        except: pass
+
+    result = mongo.db.usagerecords.insert_one({
+        'collectionItem': ObjectId(item_id),
+        'user': ObjectId(user['_id']),
+        'borrowerName': data.get('borrowerName', user.get('name', 'Unknown')),
+        'borrowDate': borrow_date,
+        'dueDate': due_date,
+        'returnDate': None,
+        'renewalCount': 0,
+        'dwellTime': 0,
+        'conditionAtBorrow': data.get('condition', 'Good'),
+        'notes': data.get('notes', ''),
+        'academicLevel': user.get('academicLevel', ''),
+        'department': user.get('department', ''),
+        'isReturned': False,
+        'isOverdue': False,
+        'createdAt': datetime.utcnow()
+    })
+
+    mongo.db.collectionitems.update_one(
+        {'_id': ObjectId(item_id)},
+        {'$inc': {'copies': -1, 'usageMetrics.totalBorrows': 1},
+         '$set': {'usageMetrics.lastUsed': borrow_date}}
+    )
+
+    # Recalculate usage score
+    item = mongo.db.collectionitems.find_one({'_id': ObjectId(item_id)})
+    m = item['usageMetrics']
+    score = m['totalBorrows'] * 0.5 + m.get('totalRenewals', 0) * 0.3 + m.get('averageDwellTime', 0) * 0.2
+    mongo.db.collectionitems.update_one(
+        {'_id': ObjectId(item_id)},
+        {'$set': {'usageMetrics.usageScore': round(score, 2)}}
+    )
+
+    return jsonify({'message': 'Item borrowed successfully', 'recordId': str(result.inserted_id), 'dueDate': due_date.isoformat()}), 201
+
+
+@analytics_bp.route('/items/<item_id>/return', methods=['POST'])
+@token_required
+def return_item(item_id):
+    user = g.current_user
+    data = request.get_json() or {}
+
+    # Find the active borrow record
+    record_query = {'collectionItem': ObjectId(item_id), 'isReturned': False}
+    record_id = data.get('recordId')
+    if record_id:
+        record_query['_id'] = ObjectId(record_id)
+    # Only check user match for non-admin
+    if user.get('role') != 'admin':
+        record_query['user'] = ObjectId(user['_id'])
+
+    record = mongo.db.usagerecords.find_one_and_update(
+        record_query,
+        {'$set': {'isReturned': True, 'returnDate': datetime.utcnow(), 'isOverdue': False}},
+        return_document=True
+    )
+    if not record:
+        return jsonify({'message': 'No active borrow found for this item'}), 404
+
+    dwell = (record['returnDate'] - record['borrowDate']).days
+
+    # Update return details
+    is_damaged = data.get('isDamaged', False)
+    missing_count = int(data.get('missingCount', 0))
+    return_updates = {
+        'dwellTime': dwell,
+        'conditionAtReturn': data.get('condition', 'Good'),
+        'isDamaged': is_damaged,
+        'damageDescription': data.get('damageDescription', ''),
+        'missingCount': missing_count,
+        'returnNotes': data.get('notes', '')
+    }
+    mongo.db.usagerecords.update_one({'_id': record['_id']}, {'$set': return_updates})
+
+    copies_to_add = 1 - missing_count
+    mongo.db.collectionitems.update_one(
+        {'_id': ObjectId(item_id)},
+        {'$inc': {'copies': copies_to_add}}
+    )
+
+    if missing_count > 0:
+        mongo.db.collectionitems.update_one(
+            {'_id': ObjectId(item_id)},
+            {'$push': {'missingItems': {
+                'recordId': str(record['_id']),
+                'borrowerName': record.get('borrowerName', 'Unknown'),
+                'missingCount': missing_count,
+                'dateReported': datetime.utcnow(),
+                'notes': data.get('notes', '')
+            }}}
+        )
+
+    # Recalculate average dwell time
+    dwells = [r['dwellTime'] for r in mongo.db.usagerecords.find(
+        {'collectionItem': ObjectId(item_id), 'isReturned': True},
+        {'dwellTime': 1}
+    )]
+    avg = sum(dwells) / len(dwells) if dwells else 0
+    mongo.db.collectionitems.update_one(
+        {'_id': ObjectId(item_id)},
+        {'$set': {'usageMetrics.averageDwellTime': round(avg, 2)}}
+    )
+
+    # Recalculate usage score
+    item = mongo.db.collectionitems.find_one({'_id': ObjectId(item_id)})
+    m = item['usageMetrics']
+    score = m['totalBorrows'] * 0.5 + m.get('totalRenewals', 0) * 0.3 + m.get('averageDwellTime', 0) * 0.2
+    retention = min(100, int(score * 5 + 20))
+    mongo.db.collectionitems.update_one(
+        {'_id': ObjectId(item_id)},
+        {'$set': {'usageMetrics.usageScore': round(score, 2), 'usageMetrics.retentionScore': retention}}
+    )
+
+    status = 'returned'
+    if is_damaged:
+        status = 'returned with damage'
+    if missing_count > 0:
+        status = f'returned with {missing_count} missing'
+    if is_damaged and missing_count > 0:
+        status = f'returned with damage and {missing_count} missing'
+
+    return jsonify({'message': f'Item {status}', 'dwellTime': dwell, 'damaged': is_damaged, 'missingCount': missing_count})
+
+
+@analytics_bp.route('/usage/borrowers', methods=['GET'])
+@admin_required
+def borrower_analytics():
+    search_q = request.args.get('search', '').strip().lower()
+
+    pipeline = [
+        {'$group': {
+            '_id': '$user',
+            'totalBorrows': {'$sum': 1},
+            'totalReturns': {'$sum': {'$cond': ['$isReturned', 1, 0]}},
+            'totalRenewals': {'$sum': '$renewalCount'},
+            'avgDwellTime': {'$avg': '$dwellTime'},
+            'lastBorrowDate': {'$max': '$borrowDate'},
+            'borrowerNames': {'$addToSet': {'$ifNull': ['$borrowerName', '']}},
+            'itemIds': {'$addToSet': '$collectionItem'}
+        }},
+        {'$sort': {'totalBorrows': -1}},
+    ]
+
+    borrowers = list(mongo.db.usagerecords.aggregate(pipeline))
+
+    # Enrich names from users collection
+    user_ids = [b['_id'] for b in borrowers if isinstance(b['_id'], ObjectId)]
+    users_map = {}
+    for u in mongo.db.users.find({'_id': {'$in': user_ids}}, {'name': 1}):
+        users_map[u['_id']] = u.get('name', 'Unknown')
+
+    # Build enriched list
+    enriched = []
+    for b in borrowers:
+        uid = b['_id']
+        name = users_map.get(uid, '') if isinstance(uid, ObjectId) else ''
+        if not name:
+            names = [n for n in b.get('borrowerNames', []) if n]
+            name = names[0] if names else str(uid)
+
+        # Get categories of items this user borrowed
+        item_ids = [ObjectId(i) for i in b.get('itemIds', []) if isinstance(i, (str, ObjectId))]
+        items = list(mongo.db.collectionitems.find(
+            {'_id': {'$in': item_ids}},
+            {'title': 1, 'category': 1, 'department': 1}
+        )) if item_ids else []
+
+        cat_counts = {}
+        for item in items:
+            cat = item.get('category', 'Unknown')
+            cat_counts[cat] = cat_counts.get(cat, 0) + 1
+        top_categories = sorted(cat_counts.items(), key=lambda x: -x[1])[:3]
+
+        dept_counts = {}
+        for item in items:
+            d = item.get('department', '')
+            if d:
+                dept_counts[d] = dept_counts.get(d, 0) + 1
+        top_departments = sorted(dept_counts.items(), key=lambda x: -x[1])[:3]
+
+        enriched.append({
+            'borrowerId': str(uid),
+            'borrowerName': name,
+            'totalBorrows': b['totalBorrows'],
+            'totalReturns': b['totalReturns'],
+            'totalRenewals': b['totalRenewals'],
+            'avgDwellTime': round(b.get('avgDwellTime', 0) or 0, 2),
+            'lastBorrowDate': b.get('lastBorrowDate').isoformat() if isinstance(b.get('lastBorrowDate'), datetime) else None,
+            'topCategories': [{'name': c, 'count': n} for c, n in top_categories],
+            'topDepartments': [{'name': d, 'count': n} for d, n in top_departments]
+        })
+
+    top = [b for b in enriched if not search_q or search_q in b['borrowerName'].lower()][:10]
+    all_b = [b for b in enriched if not search_q or search_q in b['borrowerName'].lower()]
+
+    return jsonify({'top': top, 'all': all_b, 'total': len(all_b)})
+
+
+@analytics_bp.route('/recommend/similar/<item_id>', methods=['GET'])
+@token_required
+def similar_items(item_id):
+    target = mongo.db.collectionitems.find_one({'_id': ObjectId(item_id)})
+    if not target: return jsonify({'message': 'Item not found'}), 404
+
+    items = list(mongo.db.collectionitems.find({'status': 'Active', '_id': {'$ne': ObjectId(item_id)}}))
+    all_items = [target] + items
+    vectors, _ = build_document_vectors(all_items)
+    tv = vectors.get(str(target['_id']), {})
+
+    sims = []
+    for item in items:
+        iv = vectors.get(str(item['_id']), {})
+        s = cosine_similarity(tv, iv)
+        sims.append({'_id': str(item['_id']), 'title': item.get('title'), 'author': item.get('author'),
+                     'category': item.get('category'), 'department': item.get('department'), 'similarity': round(s, 4)})
+    sims.sort(key=lambda x: x['similarity'], reverse=True)
+    return jsonify(sims[:10])
+
+
+@analytics_bp.route('/settings', methods=['GET'])
+@admin_required
+def get_settings():
+    return jsonify({'clustering': {'maxClusters': 5, 'minItemsForClustering': 10, 'usageWeight': 0.4, 'retentionWeight': 0.3, 'dwellTimeWeight': 0.3},
+                    'thresholds': {'retireThreshold': 2, 'keepThreshold': 8, 'flagThreshold': 5}})
+
+
+@analytics_bp.route('/settings', methods=['PUT'])
+@admin_required
+def update_settings():
+    return jsonify({'message': 'Settings updated', 'settings': request.get_json()})

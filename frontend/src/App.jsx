@@ -1,0 +1,40 @@
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { useAuth } from './context/AuthContext';
+import Register from './pages/Register';
+import Login from './pages/Login';
+import Layout from './components/Layout';
+import AnalyticsDashboard from './pages/AnalyticsDashboard';
+import UserDashboard from './pages/UserDashboard';
+import CollectionItems from './pages/CollectionItems';
+import ClusteringResults from './pages/ClusteringResults';
+import Recommendations from './pages/Recommendations';
+import AdminSettings from './pages/AdminSettings';
+import ProtectedRoute from './components/ProtectedRoute';
+
+function App() {
+  const { user } = useAuth();
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Routes>
+        <Route path="/register" element={user ? <Navigate to="/dashboard" /> : <Register />} />
+        <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
+        <Route path="/" element={<Navigate to={user ? "/dashboard" : "/login"} />} />
+        <Route path="/dashboard" element={
+          <ProtectedRoute>
+            <Layout />
+          </ProtectedRoute>
+        }>
+          <Route index element={user?.role === 'admin' ? <AnalyticsDashboard /> : <UserDashboard />} />
+          <Route path="borrowing" element={<UserDashboard />} />
+          <Route path="items" element={<CollectionItems />} />
+          <Route path="clustering" element={<ClusteringResults />} />
+          <Route path="recommendations" element={<Recommendations />} />
+          {user?.role === 'admin' && <Route path="admin" element={<AdminSettings />} />}
+        </Route>
+      </Routes>
+    </div>
+  );
+}
+
+export default App;
