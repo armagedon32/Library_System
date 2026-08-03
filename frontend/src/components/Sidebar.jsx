@@ -11,7 +11,7 @@ function Sidebar() {
   ];
 
   if (user?.role === 'admin') {
-    navItems.push({ to: '/dashboard/clustering', label: 'Unsupervised Learning', icon: 'bi-diagram-3' });
+    navItems[1] = { to: '/dashboard/transactions', label: 'Transactions', icon: 'bi-arrow-left-right' };
     navItems.push({ to: '/dashboard/user-clustering', label: 'User Segmentation', icon: 'bi-people' });
     navItems.push({ to: '/dashboard/reservations', label: 'Reservations', icon: 'bi-pin-angle' });
     navItems.push({ to: '/dashboard/activity', label: 'Activity Log', icon: 'bi-clock-history' });

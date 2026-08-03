@@ -94,6 +94,78 @@ def my_usage():
     return jsonify({'records': records, 'stats': {'totalBorrowed': total, 'currentlyBorrowed': current, 'overdueCount': overdue}})
 
 
+@analytics_bp.route('/transactions', methods=['GET'])
+@admin_required
+def all_transactions():
+    """All borrow/return transactions across users (admin monitoring)."""
+    status = request.args.get('status', '')  # active | returned | overdue | reserved
+    q = {}
+    if status == 'active':
+        q['isReturned'] = False
+    elif status == 'returned':
+        q['isReturned'] = True
+    elif status == 'overdue':
+        q['isOverdue'] = True
+        q['isReturned'] = False
+
+    if status == 'reserved':
+        res = list(mongo.db.reservations.find({}).sort('createdAt', -1))
+        user_ids = [r['user'] for r in res if isinstance(r.get('user'), ObjectId)]
+        users_map = {}
+        for u in mongo.db.users.find({'_id': {'$in': user_ids}}, {'name': 1}):
+            users_map[u['_id']] = u.get('name', 'Unknown')
+        return jsonify({'transactions': [{
+            '_id': str(r['_id']),
+            'borrowerName': users_map.get(r.get('user'), 'Unknown'),
+            'itemTitle': r.get('itemTitle', ''),
+            'type': 'reservation',
+            'status': 'ready' if r.get('status') == 'ready' else 'waiting',
+            'borrowDate': r['createdAt'].isoformat() if isinstance(r.get('createdAt'), datetime) else None,
+            'dueDate': None,
+            'returnDate': None,
+            'fineAmount': 0,
+            'isDamaged': False,
+        } for r in res], 'count': len(res)})
+
+    records = list(mongo.db.usagerecords.find(q).sort('borrowDate', -1).limit(300))
+    item_ids = list({r['collectionItem'] for r in records if isinstance(r.get('collectionItem'), ObjectId)})
+    items_map = {}
+    for it in mongo.db.collectionitems.find({'_id': {'$in': item_ids}}, {'title': 1}):
+        items_map[it['_id']] = it.get('title', 'Unknown')
+    user_ids = list({r['user'] for r in records if isinstance(r.get('user'), ObjectId)})
+    users_map = {}
+    for u in mongo.db.users.find({'_id': {'$in': user_ids}}, {'name': 1, 'department': 1}):
+        users_map[u['_id']] = u
+
+    out = []
+    for r in records:
+        u = users_map.get(r.get('user'), {})
+        is_active = not r.get('isReturned')
+        out.append({
+            '_id': str(r['_id']),
+            'borrowerName': r.get('borrowerName') or u.get('name', 'Unknown'),
+            'department': u.get('department', ''),
+            'itemTitle': items_map.get(r.get('collectionItem'), 'Unknown'),
+            'type': 'borrow',
+            'status': 'active' if is_active else 'returned',
+            'isOverdue': bool(r.get('isOverdue')) and is_active,
+            'borrowDate': r['borrowDate'].isoformat() if isinstance(r.get('borrowDate'), datetime) else None,
+            'dueDate': r['dueDate'].isoformat() if isinstance(r.get('dueDate'), datetime) else None,
+            'returnDate': r['returnDate'].isoformat() if isinstance(r.get('returnDate'), datetime) else None,
+            'fineAmount': r.get('fineAmount', 0),
+            'isDamaged': bool(r.get('isDamaged')),
+            'missingCount': r.get('missingCount', 0),
+        })
+
+    counts = {
+        'active': mongo.db.usagerecords.count_documents({'isReturned': False}),
+        'returned': mongo.db.usagerecords.count_documents({'isReturned': True}),
+        'overdue': mongo.db.usagerecords.count_documents({'isOverdue': True, 'isReturned': False}),
+        'reserved': mongo.db.reservations.count_documents({}),
+    }
+    return jsonify({'transactions': out, 'count': len(out), 'counts': counts})
+
+
 @analytics_bp.route('/items', methods=['POST'])
 @admin_required
 def create_item():

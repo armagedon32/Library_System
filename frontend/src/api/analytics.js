@@ -110,6 +110,11 @@ export const getActivities = async (action = '') => {
   return response.data;
 };
 
+export const getTransactions = async (status = '') => {
+  const response = await api.get('/analytics/transactions', { params: status ? { status } : {} });
+  return response.data;
+};
+
 export const borrowItem = async (itemId, data = {}) => {
   const response = await api.post(`/analytics/items/${itemId}/borrow`, data);
   return response.data;
