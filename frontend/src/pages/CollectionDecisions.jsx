@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { getCollectionDecisions, updateItemStatus } from '../api/analytics';
 import { useToast } from '../components/Toast';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList
+} from 'recharts';
 
 const TONE_MAP = {
   success: { icon: 'bi-check-circle', label: 'Keep / Retain' },
@@ -62,6 +65,14 @@ function CollectionDecisions() {
 
   const filtered = filter === 'All' ? data.decisions : data.decisions.filter((d) => d.decision === filter);
 
+  const highDemandBooks = data.decisions
+    .filter((d) => d.decision === 'Add More Copies')
+    .sort((a, b) => b.borrows - a.borrows)
+    .slice(0, 10)
+    .map((d) => ({ name: d.title, borrows: d.borrows, copies: d.copies, usageScore: d.usageScore, department: d.department }));
+
+  const deptCopies = data.departments.map((d) => ({ department: d.department, copiesToAdd: d.copiesToAdd }));
+
   return (
     <div>
       <div className="mb-4">
@@ -85,6 +96,58 @@ function CollectionDecisions() {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="row g-3 mb-4">
+        <div className="col-lg-7">
+          <div className="card border-0 shadow-sm h-100">
+            <div className="card-header bg-white pt-3 px-3 border-bottom-0">
+              <h6 className="fw-bold mb-0"><i className="bi bi-fire text-warning me-2"></i>High Demand Books — Add More Copies</h6>
+              <p className="text-muted small mb-0 mt-1">Top books needing additional copies. Hover a bar to see copies vs borrows.</p>
+            </div>
+            <div className="card-body pt-2">
+              {highDemandBooks.length === 0 ? (
+                <p className="text-muted small text-center py-4">No books flagged for additional copies.</p>
+              ) : (
+                <ResponsiveContainer width="100%" height={320}>
+                  <BarChart data={highDemandBooks} layout="vertical" margin={{ left: 20, right: 40 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis type="number" tick={{ fontSize: 12 }} />
+                    <YAxis type="category" dataKey="name" width={170} tick={{ fontSize: 11 }} />
+                    <Tooltip
+                      contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
+                      formatter={(value, name) => name === 'borrows' ? [`${value} borrows`, 'Total Borrows'] : [value, name]}
+                    />
+                    <Bar dataKey="borrows" fill="#f59e0b" radius={[0, 4, 4, 0]} name="borrows">
+                      <LabelList dataKey="borrows" position="right" style={{ fontSize: 11 }} />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="col-lg-5">
+          <div className="card border-0 shadow-sm h-100">
+            <div className="card-header bg-white pt-3 px-3 border-bottom-0">
+              <h6 className="fw-bold mb-0"><i className="bi bi-cart-plus text-primary me-2"></i>Copies to Acquire by Department</h6>
+              <p className="text-muted small mb-0 mt-1">Matches the "Copies to Acquire" column in the Coverage & Acquisition Gaps table below.</p>
+            </div>
+            <div className="card-body pt-2">
+              <ResponsiveContainer width="100%" height={320}>
+                <BarChart data={deptCopies}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="department" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }} />
+                  <Bar dataKey="copiesToAdd" fill="#6366f1" radius={[4, 4, 0, 0]} name="Copies to Acquire">
+                    <LabelList dataKey="copiesToAdd" position="top" style={{ fontSize: 11 }} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="row g-3 mb-4">
