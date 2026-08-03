@@ -242,3 +242,52 @@ def run_kmeans(items, k):
                 centroids[ci] = [sum(m[j] for m in members) / len(members) for j in range(len(members[0]))]
 
     return [{'id': str(items[i]['_id']), 'cluster': clusters[i]} for i in range(n)]
+
+
+def kmeans_feature(points, k):
+    """Generic K-Means over numeric feature vectors. points: list of dicts {'id': str, 'features': [..]}."""
+    if not points or len(points) < k:
+        return None
+
+    ids = [p['id'] for p in points]
+    raw = [p['features'] for p in points]
+    n_features = len(raw[0])
+
+    maxes = [max(r[i] for r in raw) for i in range(n_features)]
+    mins = [min(r[i] for r in raw) for i in range(n_features)]
+    norm = []
+    for r in raw:
+        row = []
+        for i, v in enumerate(r):
+            if maxes[i] == mins[i]:
+                row.append(0)
+            else:
+                row.append((v - mins[i]) / (maxes[i] - mins[i]))
+        norm.append(row)
+
+    n = len(norm)
+    centroids = [list(norm[i % n]) for i in range(k)]
+    labels = [-1] * n
+    changed = True
+    iterations = 0
+
+    while changed and iterations < 100:
+        changed = False
+        iterations += 1
+        for i, point in enumerate(norm):
+            best = 0
+            best_dist = float('inf')
+            for ci, c in enumerate(centroids):
+                d = math.sqrt(sum((point[j] - c[j]) ** 2 for j in range(len(point))))
+                if d < best_dist:
+                    best_dist = d
+                    best = ci
+            if labels[i] != best:
+                labels[i] = best
+                changed = True
+        for ci in range(k):
+            members = [norm[i] for i in range(n) if labels[i] == ci]
+            if members:
+                centroids[ci] = [sum(m[j] for m in members) / len(members) for j in range(len(members[0]))]
+
+    return [{'id': ids[i], 'cluster': labels[i]} for i in range(n)]

@@ -7,6 +7,7 @@ import AnalyticsDashboard from './pages/AnalyticsDashboard';
 import UserDashboard from './pages/UserDashboard';
 import CollectionItems from './pages/CollectionItems';
 import ClusteringResults from './pages/ClusteringResults';
+import UserClustering from './pages/UserClustering';
 import Recommendations from './pages/Recommendations';
 import CollectionDecisions from './pages/CollectionDecisions';
 import AdminSettings from './pages/AdminSettings';
@@ -30,6 +31,7 @@ function App() {
           <Route path="borrowing" element={<UserDashboard />} />
           <Route path="items" element={<CollectionItems />} />
           <Route path="clustering" element={<ClusteringResults />} />
+          <Route path="user-clustering" element={<UserClustering />} />
           <Route path="recommendations" element={<Recommendations />} />
           <Route path="collection-decisions" element={<CollectionDecisions />} />
           {user?.role === 'admin' && <Route path="admin" element={<AdminSettings />} />}

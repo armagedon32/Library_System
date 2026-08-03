@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import re
 from middleware import token_required, admin_required
 from db import mongo
-from nlp_utils import classify_category, classify_department, run_kmeans, build_document_vectors, cosine_similarity
+from nlp_utils import classify_category, classify_department, run_kmeans, build_document_vectors, cosine_similarity, kmeans_feature
 
 analytics_bp = Blueprint('analytics', __name__)
 
@@ -544,6 +544,150 @@ def borrower_analytics():
     all_b = [b for b in enriched if not search_q or search_q in b['borrowerName'].lower()]
 
     return jsonify({'top': top, 'all': all_b, 'total': len(all_b)})
+
+
+def segment_members(segments, cluster_id):
+    """Top representative users within a cluster, for summary display."""
+    members = [s for s in segments if s['cluster'] == cluster_id]
+    members.sort(key=lambda s: -s['totalBorrows'])
+    return [{'name': m['name'], 'totalBorrows': m['totalBorrows'], 'department': m['department']} for m in members[:5]]
+
+
+@analytics_bp.route('/user-clustering', methods=['GET'])
+@admin_required
+def user_clustering():
+    """Unsupervised segmentation of users by borrowing behavior & usage patterns."""
+    users = list(mongo.db.users.find({'role': {'$ne': 'admin'}}))
+    if not users:
+        return jsonify({'clusters': [], 'summary': [], 'totalUsers': 0}), 200
+
+    records_by_user = {}
+    for u in users:
+        records_by_user[str(u['_id'])] = []
+
+    all_records = list(mongo.db.usagerecords.find({}))
+    for r in all_records:
+        uid = str(r.get('user')) if isinstance(r.get('user'), ObjectId) else str(r.get('user'))
+        if uid in records_by_user:
+            records_by_user[uid].append(r)
+
+    # Category/department diversity per user
+    item_info = {}
+    ids = list({r['collectionItem'] for recs in records_by_user.values() for r in recs
+                if isinstance(r.get('collectionItem'), ObjectId)})
+    for it in mongo.db.collectionitems.find({'_id': {'$in': ids}}, {'category': 1, 'department': 1}):
+        item_info[str(it['_id'])] = it
+
+    points = []
+    segments = []
+    label_names = ['High Demand', 'Active', 'Causal / Light', 'Frequent Borrower', 'Big Spender']
+    name_colors = {
+        'High Demand': '#f59e0b', 'Active': '#10b981', 'Causal / Light': '#ec4899',
+        'Frequent Borrower': '#6366f1', 'Big Spender': '#8b5cf6'
+    }
+
+    for u in users:
+        uid = str(u['_id'])
+        recs = records_by_user.get(uid, [])
+        n = len(recs)
+        total_borrows = n
+        total_renewals = sum(r.get('renewalCount', 0) for r in recs)
+        dwells = [r.get('dwellTime', 0) for r in recs if r.get('isReturned')]
+        avg_dwell = sum(dwells) / len(dwells) if dwells else 0
+        overdue = sum(1 for r in recs if r.get('isOverdue'))
+        damaged = sum(1 for r in recs if r.get('isDamaged'))
+        missing = sum(r.get('missingCount', 0) for r in recs)
+        categories = set()
+        departments = set()
+        for r in recs:
+            cid = r.get('collectionItem')
+            if isinstance(cid, ObjectId) and str(cid) in item_info:
+                info = item_info[str(cid)]
+                if info.get('category'): categories.add(info['category'])
+                if info.get('department'): departments.add(info['department'])
+
+        features = [total_borrows, total_renewals, avg_dwell, overdue, damaged, missing,
+                    len(categories), len(departments)]
+        points.append({'id': uid, 'features': features})
+
+        # interpret labels (for overrides)
+        if total_borrows >= 25:
+            seg = 'Frequent Borrower'
+        elif total_borrows >= 12:
+            seg = 'Active'
+        elif total_borrows >= 5:
+            seg = 'Causal / Light'
+        else:
+            seg = 'Light User'
+
+        if overdue >= 3:
+            seg = 'High Dwell / Overdue'
+        if avg_dwell > 20:
+            seg = 'Long Dwell / Retention'
+
+        segments.append({
+            'userId': uid, 'name': u.get('name', 'Unknown'), 'email': u.get('email', ''),
+            'department': u.get('department', ''), 'academicLevel': u.get('academicLevel', ''),
+            'totalBorrows': total_borrows, 'totalRenewals': total_renewals,
+            'avgDwellTime': round(avg_dwell, 1), 'overdue': overdue, 'damaged': damaged,
+            'missing': missing, 'categoriesBorrowed': len(categories),
+            'departmentsBorrowed': len(departments), 'segment': seg
+        })
+
+    # Only cluster users with at least 1 borrow
+    active_points = [p for p in points if p['features'][0] > 0]
+    clusters_map = {}
+    if len(active_points) >= 3:
+        k = 2 if len(active_points) < 6 else 3
+        res = kmeans_feature(active_points, k)
+        if res:
+            clusters_map = {c['id']: c['cluster'] for c in res}
+
+    # Assign cluster + interpret as segment
+    for seg in segments:
+        cl = clusters_map.get(seg['userId'], -1)
+        seg['cluster'] = cl
+        if seg['totalBorrows'] == 0:
+            seg['segment'] = 'No Borrowing Activity'
+        else:
+            seg['segment'] = f'Cluster {cl}'
+
+    # Rank clusters by intensity to give meaningful labels
+    label_by_cluster = {}
+    cl_avg = {}
+    for cl in [0, 1, 2]:
+        members = [s for s in segments if s['cluster'] == cl]
+        if members:
+            cl_avg[cl] = sum(m['totalBorrows'] for m in members) / len(members)
+    if cl_avg:
+        ranked = sorted(cl_avg.items(), key=lambda x: -x[1])
+        labels = ['High Demand', 'Active Borrower', 'Light User']
+        for i, (cl, _) in enumerate(ranked):
+            label_by_cluster[cl] = labels[i] if i < 3 else f'Cluster {cl}'
+        for seg in segments:
+            if seg['cluster'] in label_by_cluster:
+                seg['segment'] = label_by_cluster[seg['cluster']]
+    else:
+        for seg in segments:
+            if seg['cluster'] >= 0:
+                seg['segment'] = f'Cluster {seg["cluster"]}'
+
+    summary = []
+    for cl in [-1, 0, 1, 2]:
+        members = [s for s in segments if s['cluster'] == cl]
+        if not members:
+            continue
+        label = 'No Activity' if cl == -1 else label_by_cluster.get(cl, f'Cluster {cl}')
+        summary.append({
+            'cluster': cl, 'label': label, 'count': len(members),
+            'avgBorrows': round(sum(m['totalBorrows'] for m in members) / len(members), 1),
+            'avgDwell': round(sum(m['avgDwellTime'] for m in members) / len(members), 1),
+            'overdueTotal': sum(m['overdue'] for m in members),
+            'segments': segment_members(segments, cl)
+        })
+    summary.sort(key=lambda s: s['cluster'])
+
+    return jsonify({'clusters': segments, 'summary': summary, 'totalUsers': len(segments), 'k': len([c for c in [0, 1, 2] if clusters_map])})
 
 
 @analytics_bp.route('/recommend/similar/<item_id>', methods=['GET'])
