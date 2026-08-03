@@ -59,7 +59,7 @@ function Transactions() {
             <span className="badge bg-light text-dark ms-1">{f.key === '' ? (data.count || 0) : (data.counts?.[f.key] || 0)}</span>
           </button>
         ))}
-        <button className="btn btn-sm btn-outline-secondary ms-auto" onClick={load}>
+        <button className="btn btn-sm btn-outline-secondary ms-auto" title="Refresh" onClick={load}>
           <i className="bi bi-arrow-clockwise"></i>
         </button>
       </div>
