@@ -62,6 +62,7 @@ def usage_summary():
                        'avgDwellTime': {'$round': ['$avgDwellTime', 2]}, 'uniqueUsers': {'$size': '$uniqueUsers'}}}
     ]))
 
+    top_limit = int(request.args.get('topLimit', 10) or 0)
     top_items = list(mongo.db.usagerecords.aggregate([
         {'$match': match},
         {'$lookup': {'from': 'collectionitems', 'localField': 'collectionItem', 'foreignField': '_id', 'as': 'item'}},
@@ -69,8 +70,10 @@ def usage_summary():
         {'$group': {'_id': '$collectionItem', 'title': {'$first': '$item.title'}, 'author': {'$first': '$item.author'},
                      'category': {'$first': '$item.category'}, 'borrowCount': {'$sum': 1},
                      'totalRenewals': {'$sum': '$renewalCount'}, 'avgDwellTime': {'$avg': '$dwellTime'}}},
-        {'$sort': {'borrowCount': -1}}, {'$limit': 10}
+        {'$sort': {'borrowCount': -1}},
     ]))
+    if top_limit > 0:
+        top_items = top_items[:top_limit]
     for t in top_items:
         t['_id'] = str(t['_id'])
 

@@ -14,17 +14,18 @@ function AnalyticsDashboard() {
   const [allSearch, setAllSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState('30d');
+  const [showAllItems, setShowAllItems] = useState(false);
 
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      getUsageSummary({ timeRange }).catch(() => null),
+      getUsageSummary({ timeRange, ...(showAllItems ? { topLimit: 1000 } : {}) }).catch(() => null),
       getBorrowerAnalytics().catch(() => ({ top: [], all: [] }))
     ]).then(([s, b]) => {
       setSummary(s);
       setBorrowers(b || { top: [], all: [] });
     }).finally(() => setLoading(false));
-  }, [timeRange]);
+  }, [timeRange, showAllItems]);
 
   if (loading) {
     return (
@@ -132,8 +133,11 @@ function AnalyticsDashboard() {
       <div className="card border-0 shadow-sm">
         <div className="card-header bg-white border-bottom-0 pt-4 px-4">
           <div className="d-flex justify-content-between align-items-center">
-            <h6 className="fw-bold mb-0"><i className="bi bi-trophy me-2"></i>Top 10 Items</h6>
-            <button className="btn btn-link btn-sm text-decoration-none p-0">View All</button>
+            <h6 className="fw-bold mb-0"><i className="bi bi-trophy me-2"></i>{showAllItems ? 'All Borrowed Items' : 'Top 10 Items'}</h6>
+            <button className="btn btn-link btn-sm text-decoration-none p-0"
+              onClick={() => setShowAllItems((v) => !v)}>
+              {showAllItems ? 'Show Top 10' : 'View All'}
+            </button>
           </div>
         </div>
         <div className="card-body p-0">
