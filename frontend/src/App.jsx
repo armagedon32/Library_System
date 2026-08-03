@@ -13,8 +13,7 @@ import CollectionDecisions from './pages/CollectionDecisions';
 import Reservations from './pages/Reservations';
 import ActivityLog from './pages/ActivityLog';
 import Transactions from './pages/Transactions';
-import MySettings from './pages/MySettings';
-import AdminSettings from './pages/AdminSettings';
+import Settings from './pages/Settings';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -34,7 +33,7 @@ function App() {
           <Route index element={user?.role === 'admin' ? <AnalyticsDashboard /> : <UserDashboard />} />
           <Route path="borrowing" element={<UserDashboard />} />
           <Route path="transactions" element={<Transactions />} />
-          <Route path="settings" element={<MySettings />} />
+          <Route path="settings" element={<Settings />} />
           <Route path="items" element={<CollectionItems />} />
           <Route path="clustering" element={<ClusteringResults />} />
           <Route path="user-clustering" element={<UserClustering />} />
@@ -42,7 +41,6 @@ function App() {
           <Route path="collection-decisions" element={<CollectionDecisions />} />
           <Route path="reservations" element={<Reservations />} />
           <Route path="activity" element={<ActivityLog />} />
-          {user?.role === 'admin' && <Route path="admin" element={<AdminSettings />} />}
         </Route>
       </Routes>
     </div>

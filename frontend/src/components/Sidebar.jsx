@@ -8,7 +8,6 @@ function Sidebar() {
     { to: '/dashboard', label: 'Dashboard', icon: 'bi-speedometer2' },
     { to: '/dashboard/borrowing', label: 'Borrowing', icon: 'bi-bookmark-check' },
     { to: '/dashboard/items', label: 'Collection Items', icon: 'bi-journal-richtext' },
-    { to: '/dashboard/settings', label: 'Settings', icon: 'bi-gear' },
   ];
 
   if (user?.role === 'admin') {
@@ -18,8 +17,9 @@ function Sidebar() {
     navItems.push({ to: '/dashboard/activity', label: 'Activity Log', icon: 'bi-clock-history' });
     navItems.push({ to: '/dashboard/recommendations', label: 'Recommendations', icon: 'bi-lightbulb' });
     navItems.push({ to: '/dashboard/collection-decisions', label: 'Collection Framework', icon: 'bi-clipboard-data' });
-    navItems.push({ to: '/dashboard/admin', label: 'Admin', icon: 'bi-gear' });
   }
+
+  navItems.push({ to: '/dashboard/settings', label: 'Settings', icon: 'bi-gear' });
 
   return (
     <div className="d-flex flex-column" style={{ width: '260px', minHeight: '100vh', backgroundColor: '#1e293b' }}>
