@@ -4,7 +4,7 @@ import { useToast } from '../components/Toast';
 
 const FILTERS = [
   { key: '', label: 'All', icon: 'bi-collection' },
-  { key: 'active', label: 'Active', icon: 'bi-bookmark-check' },
+  { key: 'active', label: 'Borrowed', icon: 'bi-bookmark-check' },
   { key: 'overdue', label: 'Overdue', icon: 'bi-exclamation-triangle' },
   { key: 'returned', label: 'Returned', icon: 'bi-arrow-return-left' },
   { key: 'reserved', label: 'Reservations', icon: 'bi-pin-angle' },
