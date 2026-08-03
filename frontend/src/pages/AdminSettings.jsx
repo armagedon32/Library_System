@@ -184,6 +184,9 @@ function AdminSettings() {
                 <Field label="Flag Threshold" step="0.1" value={settings.thresholds.flagThreshold}
                   hint="Items between retire and keep"
                   onChange={(e) => setGroup('thresholds', 'flagThreshold', parseFloat(e.target.value) || 0)} />
+                <Field label="Service Per Copy" step="1" value={settings.thresholds.servicePerCopy}
+                  hint="Estimated borrows one copy can serve per year (drives Copies to Add)"
+                  onChange={(e) => setGroup('thresholds', 'servicePerCopy', parseInt(e.target.value, 10) || 1)} />
               </div>
             )}
           </div>

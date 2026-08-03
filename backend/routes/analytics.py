@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, g
 from bson import ObjectId
 from datetime import datetime, timedelta
 import re
+import math
 from middleware import token_required, admin_required
 from db import mongo
 from nlp_utils import classify_category, classify_department, run_kmeans, build_document_vectors, cosine_similarity, kmeans_feature
@@ -920,6 +921,19 @@ def collection_decisions():
     items = list(mongo.db.collectionitems.find({}))
     current_year = datetime.utcnow().year
 
+    policies = get_policies()
+    keep_threshold = int(policies['thresholds'].get('keepThreshold', 8))
+    service_per_copy = max(2, int(policies['thresholds'].get('servicePerCopy', 4)))
+
+    # Real demand: borrows in the last 365 days per item (drives the 12-month forecast)
+    cutoff = datetime.utcnow() - timedelta(days=365)
+    recent_borrows = {}
+    for r in mongo.db.usagerecords.aggregate([
+        {'$match': {'borrowDate': {'$gte': cutoff}}},
+        {'$group': {'_id': '$collectionItem', 'n': {'$sum': 1}}}
+    ]):
+        recent_borrows[str(r['_id'])] = r['n']
+
     def decision_for(item):
         m = item.get('usageMetrics', {}) or {}
         borrows = m.get('totalBorrows', 0)
@@ -932,9 +946,9 @@ def collection_decisions():
 
         if condition in ('damaged', 'poor', 'Repair Needed', 'unusable'):
             return 'Repair / Replace', 'danger', f'Condition: {item.get("condition")}'
-        if borrows >= 8 and copies <= 2:
+        if borrows >= keep_threshold and copies <= 2:
             return 'Add More Copies', 'info', f'{copies} copie(s) vs {borrows} borrows'
-        if borrows >= 8:
+        if borrows >= keep_threshold:
             return 'Retain', 'success', 'High performing item'
         if cluster == -2 or (borrows == 0 and age < 5):
             return 'Monitor', 'secondary', 'Newly acquired — track usage'
@@ -952,7 +966,10 @@ def collection_decisions():
         m = item.get('usageMetrics', {})
         borrows = m.get('totalBorrows', 0)
         copies = item.get('copies', 1)
-        copies_to_add = (max(1, borrows // 8 - copies + 1) if copies >= 1 else 1) if decision == 'Add More Copies' else 0
+        recent = recent_borrows.get(str(item['_id']), 0)
+        # 12-month demand forecast: recent-year borrows projected forward (all-time rate as fallback)
+        forecast = recent if recent else round(borrows * 0.35)
+        copies_to_add = max(0, math.ceil(forecast / service_per_copy) - copies) if decision == 'Add More Copies' else 0
         decided.append({
             '_id': str(item['_id']),
             'title': item.get('title'),
@@ -961,6 +978,8 @@ def collection_decisions():
             'category': item.get('category'),
             'copies': copies,
             'copiesToAdd': copies_to_add,
+            'forecast': forecast,
+            'recentBorrows': recent,
             'condition': item.get('condition', 'New'),
             'publishYear': item.get('publishYear'),
             'cost': item.get('cost', 0),
@@ -988,7 +1007,9 @@ def collection_decisions():
     budget_by_dept = {}
     for d in add_more:
         dept = d['department'] or 'Ungrouped'
-        need = max(1, d['borrows'] // 8 - d['copies'] + 1) if d['copies'] >= 1 else 1
+        need = d['copiesToAdd']
+        if need <= 0:
+            continue
         budget_by_dept[dept] = {
             'items': budget_by_dept.get(dept, {}).get('items', 0) + 1,
             'copiesToAdd': budget_by_dept.get(dept, {}).get('copiesToAdd', 0) + need,
@@ -1031,6 +1052,11 @@ def collection_decisions():
         'summary': sorted_summary,
         'collectionSummary': collection_summary,
         'departments': dept_stats,
+        'forecastParams': {
+            'servicePerCopy': service_per_copy,
+            'keepThreshold': keep_threshold,
+            'windowMonths': 12,
+        },
     })
 
 
@@ -1040,7 +1066,7 @@ DEFAULT_SETTINGS = {
     'reservations': {'enabled': True, 'maxHoldDays': 3, 'reservationsPerUser': 3},
     'notifications': {'dueReminderDays': 2, 'availabilityNotice': True, 'emailAlerts': False},
     'clustering': {'maxClusters': 5, 'minItemsForClustering': 10, 'usageWeight': 0.4, 'retentionWeight': 0.3, 'dwellTimeWeight': 0.3},
-    'thresholds': {'retireThreshold': 2, 'keepThreshold': 8, 'flagThreshold': 5}
+    'thresholds': {'retireThreshold': 2, 'keepThreshold': 8, 'flagThreshold': 5, 'servicePerCopy': 4}
 }
 
 

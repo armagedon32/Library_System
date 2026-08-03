@@ -66,12 +66,27 @@ function CollectionDecisions() {
   const filtered = filter === 'All' ? data.decisions : data.decisions.filter((d) => d.decision === filter);
 
   const highDemandBooks = data.decisions
-    .filter((d) => d.decision === 'Add More Copies')
+    .filter((d) => d.decision === 'Add More Copies' && d.copiesToAdd > 0)
     .sort((a, b) => b.borrows - a.borrows)
     .slice(0, 10)
-    .map((d) => ({ name: d.title, borrows: d.borrows, copies: d.copies, copiesToAdd: d.copiesToAdd || 0, usageScore: d.usageScore, department: d.department }));
+    .map((d) => ({ name: d.title, borrows: d.borrows, copies: d.copies, copiesToAdd: d.copiesToAdd || 0, forecast: d.forecast || 0, department: d.department }));
 
   const deptCopies = data.departments.map((d) => ({ department: d.department, copiesToAdd: d.copiesToAdd }));
+
+  const BookTooltip = ({ active, payload }) => {
+    if (!active || !payload || !payload.length) return null;
+    const d = payload[0].payload;
+    return (
+      <div className="bg-white border rounded-3 p-2 shadow-sm" style={{ fontSize: 12 }}>
+        <div className="fw-semibold mb-1">{d.name}</div>
+        <div className="text-muted mb-1">{d.department}</div>
+        <div>Total borrows: <b>{d.borrows}</b></div>
+        <div>Forecast (12 mo): <b>{d.forecast}</b></div>
+        <div>Current copies: <b>{d.copies}</b></div>
+        <div>Copies to acquire: <b className="text-primary">{d.copiesToAdd}</b></div>
+      </div>
+    );
+  };
 
   return (
     <div>
@@ -103,7 +118,10 @@ function CollectionDecisions() {
           <div className="card border-0 shadow-sm h-100">
             <div className="card-header bg-white pt-3 px-3 border-bottom-0">
               <h6 className="fw-bold mb-0"><i className="bi bi-fire text-warning me-2"></i>High Demand Books — Add More Copies</h6>
-              <p className="text-muted small mb-0 mt-1">Top books needing additional copies. Orange = demand (borrows), blue = copies to acquire.</p>
+              <p className="text-muted small mb-0 mt-1">
+                Orange = borrows (demand), blue = copies to acquire from the 12-month forecast
+                (Copies to Add = forecast / {data.forecastParams?.servicePerCopy || 4} per copy − existing copies).
+              </p>
             </div>
             <div className="card-body pt-2">
               {highDemandBooks.length === 0 ? (
@@ -114,18 +132,10 @@ function CollectionDecisions() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis type="number" tick={{ fontSize: 12 }} />
                     <YAxis type="category" dataKey="name" width={170} tick={{ fontSize: 11 }} />
-                    <Tooltip
-                      contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
-                      formatter={(value, name) => {
-                        if (name === 'borrows') return [`${value}`, 'Total Borrows'];
-                        if (name === 'copiesToAdd') return [`${value}`, 'Copies to Acquire'];
-                        return [value, name];
-                      }}
-                      labelFormatter={(label) => `${label}`}
-                    />
+                    <Tooltip content={<BookTooltip />} cursor={{ fill: '#f3f4f6' }} />
                     <Legend />
-                    <Bar dataKey="borrows" fill="#f59e0b" radius={[0, 4, 4, 0]} name="borrows" />
-                    <Bar dataKey="copiesToAdd" fill="#6366f1" radius={[0, 4, 4, 0]} name="copiesToAdd">
+                    <Bar dataKey="borrows" fill="#f59e0b" radius={[0, 4, 4, 0]} name="Total Borrows" />
+                    <Bar dataKey="copiesToAdd" fill="#6366f1" radius={[0, 4, 4, 0]} name="Copies to Acquire">
                       <LabelList dataKey="copiesToAdd" position="right" style={{ fontSize: 11, fill: '#6366f1' }} />
                     </Bar>
                   </BarChart>
@@ -138,7 +148,7 @@ function CollectionDecisions() {
           <div className="card border-0 shadow-sm h-100">
             <div className="card-header bg-white pt-3 px-3 border-bottom-0">
               <h6 className="fw-bold mb-0"><i className="bi bi-cart-plus text-primary me-2"></i>Copies to Acquire by Department</h6>
-              <p className="text-muted small mb-0 mt-1">Matches the "Copies to Acquire" column in the Coverage & Acquisition Gaps table below.</p>
+              <p className="text-muted small mb-0 mt-1">Sum of the per-book forecast below; matches the "Copies to Acquire" column in the Coverage & Acquisition Gaps table.</p>
             </div>
             <div className="card-body pt-2">
               <ResponsiveContainer width="100%" height={320}>
@@ -244,6 +254,7 @@ function CollectionDecisions() {
                   <th className="small">Author</th>
                   <th className="small">Dept</th>
                   <th className="small">Borrows</th>
+                  <th className="small">Forecast (12 mo)</th>
                   <th className="small">Usage Score</th>
                   <th className="small">Copies</th>
                   <th className="small">Copies to Add</th>
@@ -264,6 +275,7 @@ function CollectionDecisions() {
                       <td className="text-muted">{item.author}</td>
                       <td><small>{item.department}</small></td>
                       <td>{item.borrows}</td>
+                      <td className="text-muted">{item.forecast}</td>
                       <td>{item.usageScore}</td>
                       <td>{item.copies}</td>
                       <td>{item.copiesToAdd > 0 ? <span className="fw-bold text-primary">{item.copiesToAdd}</span> : '—'}</td>
