@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { getClusteringResults, runClustering } from '../api/analytics';
 import { useToast } from '../components/Toast';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+
+const CLUSTER_COLORS = ['#6366f1', '#ec4899', '#10b981', '#f59e0b', '#3b82f6'];
 
 function ClusteringResults() {
   const { addToast } = useToast();
@@ -9,7 +12,25 @@ function ClusteringResults() {
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
 
-  useEffect(() => { loadResults(); }, []);
+  useEffect(() => {
+    const auto = async () => {
+      setLoading(true);
+      try {
+        let data = await getClusteringResults();
+        if ((data.results || []).length === 0) {
+          await runClustering().catch(() => null);
+          data = await getClusteringResults();
+        }
+        setResults(data.results || []);
+        setSummary(data.summary || []);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    auto();
+  }, []);
 
   const loadResults = async () => {
     setLoading(true);
@@ -77,6 +98,43 @@ function ClusteringResults() {
           <div className="card-header bg-white pt-4 px-4 border-bottom-0">
             <h6 className="fw-bold mb-0"><i className="bi bi-table me-2"></i>Cluster Summary</h6>
           </div>
+          <div className="card-body">
+            <div className="row g-4">
+              <div className="col-md-5">
+                <h6 className="small text-muted mb-3">Distribution of Items per Cluster</h6>
+                <ResponsiveContainer width="100%" height={180}>
+                  <PieChart>
+                    <Pie data={summary} dataKey="count" nameKey="_id" innerRadius={45} outerRadius={75} paddingAngle={3}>
+                      {summary.map((c, i) => (
+                        <Cell key={c._id} fill={CLUSTER_COLORS[i % CLUSTER_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="col-md-6">
+                <h6 className="small text-muted mb-3">Avg Usage Score per Cluster</h6>
+                <ResponsiveContainer width="100%" height={180}>
+                  <BarChart data={summary}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="_id" label={{ value: 'Cluster', position: 'insideBottom', offset: -2 }} />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="avgUsageScore" fill="#6366f1" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {summary.length > 0 && (
+        <div className="card border-0 shadow-sm mb-4">
+          <div className="card-header bg-white pt-4 px-4 border-bottom-0">
+            <h6 className="fw-bold mb-0"><i className="bi bi-table me-2"></i>Cluster Statistics</h6>
+          </div>
           <div className="table-responsive">
             <table className="table table-hover align-middle mb-0">
               <thead className="table-light">
@@ -94,10 +152,10 @@ function ClusteringResults() {
                   <tr key={c._id}>
                     <td><span className="badge bg-dark">Cluster {c._id}</span></td>
                     <td className="fw-medium">{c.count}</td>
-                    <td>{c.avgUsageScore.toFixed(2)}</td>
-                    <td>{c.avgRetentionScore.toFixed(2)}</td>
-                    <td>{c.avgBorrows.toFixed(2)}</td>
-                    <td className="text-muted">{c.avgDwellTime?.toFixed(2) || 0}</td>
+                    <td>{Number(c.avgUsageScore || 0).toFixed(2)}</td>
+                    <td>{Number(c.avgRetentionScore || 0).toFixed(2)}</td>
+                    <td>{Number(c.avgBorrows || 0).toFixed(2)}</td>
+                    <td className="text-muted">{Number(c.avgDwellTime || 0).toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
