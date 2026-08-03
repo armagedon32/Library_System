@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { getCollectionItems, borrowItem, downloadItemsCsv, uploadItemsCsv } from '../api/analytics';
 import AddItemModal from '../components/AddItemModal';
 import BorrowModal from '../components/BorrowModal';
+import SimilarBooksModal from '../components/SimilarBooksModal';
 import { useToast } from '../components/Toast';
 
 function CollectionItems() {
@@ -13,6 +14,8 @@ function CollectionItems() {
   const [showModal, setShowModal] = useState(false);
   const [showBorrowModal, setShowBorrowModal] = useState(false);
   const [borrowItemData, setBorrowItemData] = useState(null);
+  const [showSimilarModal, setShowSimilarModal] = useState(false);
+  const [similarItemData, setSimilarItemData] = useState(null);
   const debounceRef = useRef(null);
 
   useEffect(() => {
@@ -45,6 +48,11 @@ function CollectionItems() {
   const openBorrowForm = (item) => {
     setBorrowItemData(item);
     setShowBorrowModal(true);
+  };
+
+  const openSimilar = (item) => {
+    setSimilarItemData(item);
+    setShowSimilarModal(true);
   };
 
   const confirmBorrow = async (form) => {
@@ -214,6 +222,10 @@ function CollectionItems() {
                         disabled={item.copies < 1} title={item.copies < 1 ? 'No copies available' : 'Borrow this item'}>
                         <i className="bi bi-bookmark-plus"></i>
                       </button>
+                      <button className="btn btn-sm btn-outline-secondary ms-1 me-1" onClick={() => openSimilar(item)}
+                        title="View similar books">
+                        <i className="bi bi-shuffle"></i>
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -224,6 +236,8 @@ function CollectionItems() {
       </div>
 
       <BorrowModal show={showBorrowModal} item={borrowItemData} onClose={() => { setShowBorrowModal(false); setBorrowItemData(null); }} onConfirm={confirmBorrow} />
+      <SimilarBooksModal show={showSimilarModal} item={similarItemData}
+        onClose={() => { setShowSimilarModal(false); setSimilarItemData(null); }} />
       <AddItemModal show={showModal} onClose={() => setShowModal(false)} onSuccess={handleSuccess} />
     </div>
   );
