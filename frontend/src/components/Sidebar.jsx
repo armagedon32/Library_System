@@ -8,6 +8,7 @@ function Sidebar() {
     { to: '/dashboard', label: 'Dashboard', icon: 'bi-speedometer2' },
     { to: '/dashboard/borrowing', label: 'Borrowing', icon: 'bi-bookmark-check' },
     { to: '/dashboard/items', label: 'Collection Items', icon: 'bi-journal-richtext' },
+    { to: '/dashboard/settings', label: 'Settings', icon: 'bi-gear' },
   ];
 
   if (user?.role === 'admin') {

@@ -26,6 +26,9 @@ def user_to_dict(user, include_token=False):
         'email': user.get('email', ''),
         'role': user.get('role', 'user'),
         'department': user.get('department', ''),
+        'academicLevel': user.get('academicLevel', ''),
+        'contactNumber': user.get('contactNumber', ''),
+        'createdAt': user.get('createdAt').isoformat() if isinstance(user.get('createdAt'), datetime) else None,
     }
     return data
 
@@ -118,3 +121,49 @@ def login():
 def get_me():
     user = g.current_user
     return jsonify(user_to_dict(user))
+
+
+@auth_bp.route('/profile', methods=['PUT'])
+@token_required
+def update_profile():
+    user = g.current_user
+    data = request.get_json() or {}
+    name = (data.get('name') or '').strip()
+    department = (data.get('department') or '').strip()
+    academic_level = (data.get('academicLevel') or '').strip()
+    contact = (data.get('contactNumber') or '').strip()
+
+    if not name:
+        return jsonify({'message': 'Name is required'}), 400
+
+    update = {'name': name, 'department': department,
+              'academicLevel': academic_level, 'contactNumber': contact}
+    mongo.db.users.update_one({'_id': ObjectId(user['_id'])}, {'$set': update})
+    log_activity(user['_id'], 'Update Profile', f'Profile updated for "{name}"')
+    updated = mongo.db.users.find_one({'_id': ObjectId(user['_id'])})
+    return jsonify(user_to_dict(updated))
+
+
+@auth_bp.route('/password', methods=['PUT'])
+@token_required
+def change_password():
+    user = g.current_user
+    data = request.get_json() or {}
+    current = data.get('currentPassword', '')
+    new_password = data.get('newPassword', '')
+
+    if not current or not new_password:
+        return jsonify({'message': 'Please provide current and new password'}), 400
+    if len(new_password) < 6:
+        return jsonify({'message': 'New password must be at least 6 characters'}), 400
+
+    stored = user['password']
+    if isinstance(stored, str):
+        stored = stored.encode('utf-8')
+    if not bcrypt.checkpw(current.encode('utf-8'), stored):
+        return jsonify({'message': 'Current password is incorrect'}), 400
+
+    hashed = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt(12))
+    mongo.db.users.update_one({'_id': ObjectId(user['_id'])}, {'$set': {'password': hashed}})
+    log_activity(user['_id'], 'Change Password', 'Password changed')
+    return jsonify({'message': 'Password updated successfully'})

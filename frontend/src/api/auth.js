@@ -46,6 +46,16 @@ export const getMe = async () => {
   return response.data;
 };
 
+export const updateProfile = async (profile) => {
+  const response = await api.put('/auth/profile', profile);
+  return response.data;
+};
+
+export const changePassword = async (payload) => {
+  const response = await api.put('/auth/password', payload);
+  return response.data;
+};
+
 export const logout = () => {
   localStorage.removeItem('token');
   localStorage.removeItem('user');
