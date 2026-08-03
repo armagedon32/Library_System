@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { getMyUsage, returnItem, borrowItem, getCollectionItems, reserveItem, getMyReservations, cancelReservation, getRecommendationsForMe } from '../api/analytics';
+import { getMyUsage, borrowItem, reserveItem, getMyReservations, cancelReservation, getRecommendationsForMe } from '../api/analytics';
 import BorrowModal from '../components/BorrowModal';
-import ReturnModal from '../components/ReturnModal';
 import { useToast } from '../components/Toast';
 
 function UserDashboard() {
@@ -10,21 +9,21 @@ function UserDashboard() {
   const { addToast } = useToast();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [availableItems, setAvailableItems] = useState([]);
-  const [showBorrowModal, setShowBorrowModal] = useState(false);
-  const [borrowItemData, setBorrowItemData] = useState(null);
-  const [showReturnModal, setShowReturnModal] = useState(false);
-  const [returnRecord, setReturnRecord] = useState(null);
-  const [bookSearch, setBookSearch] = useState('');
   const [reservations, setReservations] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
+  const [showBorrowModal, setShowBorrowModal] = useState(false);
+  const [borrowItemData, setBorrowItemData] = useState(null);
 
   useEffect(() => {
     loadData();
-    getCollectionItems({ status: 'Active', limit: 100 }).then(d => setAvailableItems(d.items || [])).catch(() => {});
     getMyReservations().then(d => setReservations(d.reservations || [])).catch(() => {});
     getRecommendationsForMe().then(d => setRecommendations(d.recommendations || [])).catch(() => {});
   }, []);
+
+  const loadData = () => {
+    setLoading(true);
+    getMyUsage().then(setData).catch(console.error).finally(() => setLoading(false));
+  };
 
   const handleReserve = async (item) => {
     try {
@@ -46,29 +45,6 @@ function UserDashboard() {
     }
   };
 
-  const loadData = () => {
-    setLoading(true);
-    getMyUsage().then(setData).catch(console.error).finally(() => setLoading(false));
-  };
-
-  const handleReturn = (record) => {
-    setReturnRecord(record);
-    setShowReturnModal(true);
-  };
-
-  const confirmReturn = async (form) => {
-    try {
-      const itemId = returnRecord.collectionItem?._id || returnRecord.itemId;
-      const res = await returnItem(itemId, form);
-      addToast(res.message, 'success');
-      setShowReturnModal(false);
-      setReturnRecord(null);
-      loadData();
-    } catch (err) {
-      addToast(err.response?.data?.message || 'Failed to return', 'danger');
-    }
-  };
-
   const openBorrowForm = (item) => {
     setBorrowItemData(item);
     setShowBorrowModal(true);
@@ -81,7 +57,6 @@ function UserDashboard() {
       setShowBorrowModal(false);
       setBorrowItemData(null);
       loadData();
-      getCollectionItems({ status: 'Active', limit: 100 }).then(d => setAvailableItems(d.items || [])).catch(() => {});
     } catch (err) {
       addToast(err.response?.data?.message || err.message || 'Failed to borrow', 'danger');
     }
@@ -99,7 +74,7 @@ function UserDashboard() {
     <div>
       <div className="mb-4">
         <h4 className="fw-bold mb-1">Welcome, {user?.name}!</h4>
-        <p className="text-muted small mb-0">Library Collection Decision Framework — User Dashboard</p>
+        <p className="text-muted small mb-0">Your Library Dashboard — overview of your borrowing activity</p>
       </div>
 
       <div className="row g-3 mb-4">
@@ -164,50 +139,6 @@ function UserDashboard() {
           </div>
         </div>
       </div>
-
-      {data?.records?.filter(r => !r.isReturned).length > 0 && (
-        <div className="card border-0 shadow-sm mb-4">
-          <div className="card-header bg-white border-bottom-0 pt-4 px-4">
-            <h6 className="fw-bold mb-0"><i className="bi bi-bookmark-check me-2"></i>Currently Borrowed</h6>
-          </div>
-          <div className="table-responsive">
-            <table className="table table-hover align-middle mb-0">
-              <thead className="table-light">
-                <tr>
-                  <th className="small fw-semibold">Title</th>
-                  <th className="small fw-semibold">Author</th>
-                  <th className="small fw-semibold">Borrow Date</th>
-                  <th className="small fw-semibold">Due Date</th>
-                  <th className="small fw-semibold">Status</th>
-                  <th className="small fw-semibold"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {data?.records?.filter(r => !r.isReturned).map((record) => (
-                  <tr key={record._id}>
-                    <td className="fw-medium">{record.collectionItem?.title || 'Unknown'}</td>
-                    <td className="text-muted">{record.collectionItem?.author || 'Unknown'}</td>
-                    <td className="text-muted">{new Date(record.borrowDate).toLocaleDateString()}</td>
-                    <td className="text-muted">{new Date(record.dueDate).toLocaleDateString()}</td>
-                    <td>
-                      {record.isOverdue ? (
-                        <span className="badge bg-danger">Overdue</span>
-                      ) : (
-                        <span className="badge bg-warning text-dark">Borrowed</span>
-                      )}
-                    </td>
-                    <td>
-                      <button className="btn btn-sm btn-success" onClick={() => handleReturn(record)}>
-                        <i className="bi bi-arrow-return-left me-1"></i>Return
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
       <div className="card border-0 shadow-sm mb-4">
         <div className="card-header bg-white border-bottom-0 pt-4 px-4">
@@ -293,99 +224,7 @@ function UserDashboard() {
         </div>
       </div>
 
-      <div className="card border-0 shadow-sm mb-4">
-        <div className="card-header bg-white border-bottom-0 pt-4 px-4">
-          <div className="d-flex justify-content-between align-items-center">
-            <h6 className="fw-bold mb-0"><i className="bi bi-book me-2"></i>Available Books</h6>
-            <div className="input-group input-group-sm" style={{ width: '250px' }}>
-              <span className="input-group-text bg-white"><i className="bi bi-search"></i></span>
-              <input className="form-control" placeholder="Search by title or author..." value={bookSearch}
-                onChange={(e) => setBookSearch(e.target.value)} />
-            </div>
-          </div>
-        </div>
-        <div className="table-responsive">
-          <table className="table table-hover align-middle mb-0">
-            <thead className="table-light">
-              <tr>
-                <th className="small fw-semibold">Title</th>
-                <th className="small fw-semibold">Author</th>
-                <th className="small fw-semibold">Category</th>
-                <th className="small fw-semibold">Copies</th>
-                <th className="small fw-semibold"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {availableItems.filter(i => i.copies > 0 && (!bookSearch || i.title.toLowerCase().includes(bookSearch.toLowerCase()) || i.author.toLowerCase().includes(bookSearch.toLowerCase()))).slice(0, 20).map((item) => (
-                <tr key={item._id}>
-                  <td className="fw-medium">{item.title}</td>
-                  <td className="text-muted">{item.author}</td>
-                  <td className="text-muted">{item.category}</td>
-                  <td><span className="badge bg-info">{item.copies}</span></td>
-                  <td>
-                    <button className="btn btn-sm btn-outline-primary me-1" onClick={() => openBorrowForm(item)}>
-                      <i className="bi bi-bookmark-plus me-1"></i>Borrow
-                    </button>
-                    <button className="btn btn-sm btn-outline-warning" onClick={() => handleReserve(item)}>
-                      <i className="bi bi-pin-angle me-1"></i>Reserve
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="card border-0 shadow-sm">
-        <div className="card-header bg-white border-bottom-0 pt-4 px-4">
-          <h6 className="fw-bold mb-0"><i className="bi bi-clock-history me-2"></i>My Borrowing History</h6>
-        </div>
-        <div className="card-body p-4">
-          {data?.records?.length === 0 ? (
-            <div className="text-center py-5">
-              <i className="bi bi-journal text-muted" style={{ fontSize: '3rem' }}></i>
-              <p className="text-muted mt-3 mb-0">Wala ka pang na-borrow na items.</p>
-            </div>
-          ) : (
-            <div className="table-responsive">
-              <table className="table table-hover align-middle mb-0">
-                <thead className="table-light">
-                  <tr>
-                    <th className="small fw-semibold">Title</th>
-                    <th className="small fw-semibold">Author</th>
-                    <th className="small fw-semibold">Borrow Date</th>
-                    <th className="small fw-semibold">Due Date</th>
-                    <th className="small fw-semibold">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data?.records?.map((record) => (
-                    <tr key={record._id}>
-                      <td className="fw-medium">{record.collectionItem?.title || 'Unknown'}</td>
-                      <td className="text-muted">{record.collectionItem?.author || 'Unknown'}</td>
-                      <td className="text-muted">{new Date(record.borrowDate).toLocaleDateString()}</td>
-                      <td className="text-muted">{new Date(record.dueDate).toLocaleDateString()}</td>
-                      <td>
-                        {!record.isReturned && record.isOverdue ? (
-                          <span className="badge bg-danger">Overdue</span>
-                        ) : !record.isReturned ? (
-                          <span className="badge bg-warning text-dark">Borrowed</span>
-                        ) : (
-                          <span className="badge bg-success">Returned</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-
       <BorrowModal show={showBorrowModal} item={borrowItemData} onClose={() => { setShowBorrowModal(false); setBorrowItemData(null); }} onConfirm={confirmBorrow} />
-      <ReturnModal show={showReturnModal} record={returnRecord} onClose={() => { setShowReturnModal(false); setReturnRecord(null); }} onConfirm={confirmReturn} />
     </div>
   );
 }

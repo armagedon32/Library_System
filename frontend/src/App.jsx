@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Layout from './components/Layout';
 import AnalyticsDashboard from './pages/AnalyticsDashboard';
 import UserDashboard from './pages/UserDashboard';
+import UserBorrowing from './pages/UserBorrowing';
 import CollectionItems from './pages/CollectionItems';
 import ClusteringResults from './pages/ClusteringResults';
 import UserClustering from './pages/UserClustering';
@@ -31,7 +32,7 @@ function App() {
           </ProtectedRoute>
         }>
           <Route index element={user?.role === 'admin' ? <AnalyticsDashboard /> : <UserDashboard />} />
-          <Route path="borrowing" element={<UserDashboard />} />
+          <Route path="borrowing" element={<UserBorrowing />} />
           <Route path="transactions" element={<Transactions />} />
           <Route path="settings" element={<Settings />} />
           <Route path="items" element={<CollectionItems />} />
