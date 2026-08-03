@@ -5,6 +5,7 @@ import re
 from middleware import token_required, admin_required
 from db import mongo
 from nlp_utils import classify_category, classify_department, run_kmeans, build_document_vectors, cosine_similarity, kmeans_feature
+from activity import log_activity
 
 analytics_bp = Blueprint('analytics', __name__)
 
@@ -126,6 +127,7 @@ def create_item():
     }
     result = mongo.db.collectionitems.insert_one(item)
     item['_id'] = result.inserted_id
+    log_activity(g.current_user.get('_id'), 'Add Item', f'Added "{title}" by {author}', result.inserted_id)
     return jsonify(item_to_dict(item)), 201
 
 
@@ -232,6 +234,7 @@ def upload_items():
         mongo.db.collectionitems.insert_one(item)
         created += 1
 
+    log_activity(g.current_user.get('_id'), 'CSV Upload', f'Imported {created} item(s) from CSV')
     msg = f'{created} items imported successfully'
     if errors:
         msg += f' with {len(errors)} errors'
@@ -286,6 +289,7 @@ def run_clustering():
         {'$group': {'_id': '$cluster', 'count': {'$sum': 1}, 'avgUsageScore': {'$avg': '$usageMetrics.usageScore'},
                      'avgRetentionScore': {'$avg': '$usageMetrics.retentionScore'}, 'avgBorrows': {'$avg': '$usageMetrics.totalBorrows'}}}
     ]))
+    log_activity(g.current_user.get('_id'), 'Run Clustering', f'K-Means completed with k={k}, {len(new_items)} new items')
     return jsonify({'message': 'Clustering completed', 'k': k, 'clusterStats': stats, 'newItemsCount': len(new_items)})
 
 
@@ -318,6 +322,7 @@ def update_item_status(item_id):
     status = request.get_json().get('status')
     item = mongo.db.collectionitems.find_one_and_update({'_id': ObjectId(item_id)}, {'$set': {'status': status}}, return_document=True)
     if not item: return jsonify({'message': 'Item not found'}), 404
+    log_activity(g.current_user.get('_id'), 'Update Item Status', f'"{item.get("title")}" set to {status}', item_id)
     return jsonify(item_to_dict(item))
 
 
@@ -392,8 +397,8 @@ def borrow_item(item_id):
         {'$set': {'usageMetrics.usageScore': round(score, 2)}}
     )
 
+    log_activity(user.get('_id'), 'Borrow', f'"{item.get("title")}" borrowed', item_id)
     return jsonify({'message': 'Item borrowed successfully', 'recordId': str(result.inserted_id), 'dueDate': due_date.isoformat()}), 201
-
 
 @analytics_bp.route('/items/<item_id>/return', methods=['POST'])
 @token_required
@@ -497,6 +502,7 @@ def return_item(item_id):
     if is_damaged and missing_count > 0:
         status = f'returned with damage and {missing_count} missing'
 
+    log_activity(user.get('_id'), 'Return', f'"{item.get("title")}" returned (overdue {overdue_days}d, fine {fine})', item_id)
     return jsonify({'message': f'Item {status}', 'dwellTime': dwell, 'damaged': is_damaged,
                     'missingCount': missing_count, 'overdue': is_overdue, 'overdueDays': overdue_days,
                     'fineAmount': fine})
@@ -958,6 +964,7 @@ def reserve_item(item_id):
         'status': 'waiting',
         'createdAt': datetime.utcnow()
     })
+    log_activity(user.get('_id'), 'Reserve', f'Reserved "{item.get("title")}"', item_id)
     return jsonify({'message': f'"{item.get("title")}" added to reservation list'}), 201
 
 
@@ -1000,6 +1007,7 @@ def all_reservations():
 @token_required
 def cancel_reservation(res_id):
     mongo.db.reservations.delete_one({'_id': ObjectId(res_id), 'user': ObjectId(g.current_user['_id'])})
+    log_activity(g.current_user.get('_id'), 'Cancel Reservation', f'Cancelled reservation {res_id}')
     return jsonify({'message': 'Reservation cancelled'})
 
 
@@ -1023,6 +1031,31 @@ def mark_notifications_read():
     return jsonify({'message': 'All notifications marked as read'})
 
 
+@analytics_bp.route('/activities', methods=['GET'])
+@admin_required
+def get_activities():
+    action = request.args.get('action')
+    q = {}
+    if action:
+        q['action'] = action
+    acts = list(mongo.db.activities.find(q).sort('createdAt', -1).limit(200))
+    user_ids = [a['user'] for a in acts if isinstance(a.get('user'), ObjectId)]
+    users_map = {}
+    for u in mongo.db.users.find({'_id': {'$in': user_ids}}, {'name': 1}):
+        users_map[u['_id']] = u.get('name', 'Unknown')
+    out = []
+    for a in acts:
+        out.append({
+            '_id': str(a['_id']),
+            'userName': users_map.get(a.get('user'), 'System'),
+            'action': a.get('action'),
+            'details': a.get('details', ''),
+            'createdAt': a['createdAt'].isoformat() if isinstance(a.get('createdAt'), datetime) else None,
+        })
+    actions = [a for a in mongo.db.activities.distinct('action') if a]
+    return jsonify({'activities': out, 'actions': sorted(actions)})
+
+
 @analytics_bp.route('/settings', methods=['GET'])
 @admin_required
 def get_settings():
@@ -1036,4 +1069,6 @@ def update_settings():
     doc = dict(data)
     doc['_id'] = 'policy'
     mongo.db.settings.replace_one({'_id': 'policy'}, doc, upsert=True)
+    changed = [f'{k}: {v}' for k, v in data.items() if isinstance(v, dict)]
+    log_activity(g.current_user.get('_id'), 'Update Settings', f'Updated settings: {", ".join(changed) if changed else "policy"}')
     return jsonify({'message': 'Settings updated', 'settings': get_policies()})

@@ -11,6 +11,7 @@ import UserClustering from './pages/UserClustering';
 import Recommendations from './pages/Recommendations';
 import CollectionDecisions from './pages/CollectionDecisions';
 import Reservations from './pages/Reservations';
+import ActivityLog from './pages/ActivityLog';
 import AdminSettings from './pages/AdminSettings';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -36,6 +37,7 @@ function App() {
           <Route path="recommendations" element={<Recommendations />} />
           <Route path="collection-decisions" element={<CollectionDecisions />} />
           <Route path="reservations" element={<Reservations />} />
+          <Route path="activity" element={<ActivityLog />} />
           {user?.role === 'admin' && <Route path="admin" element={<AdminSettings />} />}
         </Route>
       </Routes>

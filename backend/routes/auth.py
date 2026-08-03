@@ -6,6 +6,7 @@ from bson import ObjectId
 from db import mongo
 from config import JWT_SECRET, ADMIN_KEY
 from middleware import token_required
+from activity import log_activity
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -56,6 +57,7 @@ def register():
     token = generate_token(result.inserted_id)
     user_data = user_to_dict({'email': email, 'name': name, 'department': department, 'role': 'user', '_id': result.inserted_id})
     user_data['token'] = token
+    log_activity(None, 'User Registered', f'New user "{name}" registered ({email})')
     return jsonify(user_data), 201
 
 
@@ -84,6 +86,7 @@ def register_admin():
     token = generate_token(result.inserted_id)
     user_data = user_to_dict({'email': email, 'name': name, 'department': department, 'role': 'admin', '_id': result.inserted_id})
     user_data['token'] = token
+    log_activity(None, 'Admin Registered', f'New admin "{name}" created ({email})')
     return jsonify(user_data), 201
 
 

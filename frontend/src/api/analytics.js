@@ -105,6 +105,11 @@ export const markNotificationsRead = async () => {
   return response.data;
 };
 
+export const getActivities = async (action = '') => {
+  const response = await api.get('/analytics/activities', { params: action ? { action } : {} });
+  return response.data;
+};
+
 export const borrowItem = async (itemId, data = {}) => {
   const response = await api.post(`/analytics/items/${itemId}/borrow`, data);
   return response.data;
