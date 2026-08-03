@@ -76,14 +76,15 @@ function CollectionDecisions() {
   const BookTooltip = ({ active, payload }) => {
     if (!active || !payload || !payload.length) return null;
     const d = payload[0].payload;
+    const perCopy = data.forecastParams?.servicePerCopy || 4;
     return (
       <div className="bg-white border rounded-3 p-2 shadow-sm" style={{ fontSize: 12 }}>
         <div className="fw-semibold mb-1">{d.name}</div>
         <div className="text-muted mb-1">{d.department}</div>
-        <div>Total borrows: <b>{d.borrows}</b></div>
-        <div>Forecast (12 mo): <b>{d.forecast}</b></div>
+        <div>Borrows (demand): <b>{d.borrows}</b></div>
+        <div>Projected borrows (12 mo): <b>{d.forecast}</b></div>
         <div>Current copies: <b>{d.copies}</b></div>
-        <div>Copies to acquire: <b className="text-primary">{d.copiesToAdd}</b></div>
+        <div>Copies to add: <b className="text-primary">{d.copiesToAdd}</b> <span className="text-muted">(= {d.forecast} ÷ {perCopy} − {d.copies})</span></div>
       </div>
     );
   };
@@ -119,8 +120,8 @@ function CollectionDecisions() {
             <div className="card-header bg-white pt-3 px-3 border-bottom-0">
               <h6 className="fw-bold mb-0"><i className="bi bi-fire text-warning me-2"></i>High Demand Books — Add More Copies</h6>
               <p className="text-muted small mb-0 mt-1">
-                Orange = borrows (demand), blue = copies to acquire from the 12-month forecast
-                (Copies to Add = forecast / {data.forecastParams?.servicePerCopy || 4} per copy − existing copies).
+                Orange = borrows (demand), blue = copies to add. Hover a bar to see the calculation:
+                <b> Copies to Add = projected borrows ÷ {data.forecastParams?.servicePerCopy || 4} − existing copies</b>.
               </p>
             </div>
             <div className="card-body pt-2">
@@ -254,7 +255,6 @@ function CollectionDecisions() {
                   <th className="small">Author</th>
                   <th className="small">Dept</th>
                   <th className="small">Borrows</th>
-                  <th className="small">Forecast (12 mo)</th>
                   <th className="small">Usage Score</th>
                   <th className="small">Copies</th>
                   <th className="small">Copies to Add</th>
@@ -275,7 +275,6 @@ function CollectionDecisions() {
                       <td className="text-muted">{item.author}</td>
                       <td><small>{item.department}</small></td>
                       <td>{item.borrows}</td>
-                      <td className="text-muted">{item.forecast}</td>
                       <td>{item.usageScore}</td>
                       <td>{item.copies}</td>
                       <td>{item.copiesToAdd > 0 ? <span className="fw-bold text-primary">{item.copiesToAdd}</span> : '—'}</td>
