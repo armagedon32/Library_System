@@ -60,7 +60,7 @@ function ClusteringResults() {
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
-          <h4 className="fw-bold mb-1">K-Means Clustering Results</h4>
+          <h4 className="fw-bold mb-1">Unsupervised Learning — K-Means Clustering</h4>
           <p className="text-muted small mb-0">Unsupervised learning for collection decision support</p>
         </div>
         <button className="btn btn-dark btn-sm" onClick={handleRunClustering} disabled={running}>
