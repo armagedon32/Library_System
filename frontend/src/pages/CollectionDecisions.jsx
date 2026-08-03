@@ -69,7 +69,7 @@ function CollectionDecisions() {
     .filter((d) => d.decision === 'Add More Copies')
     .sort((a, b) => b.borrows - a.borrows)
     .slice(0, 10)
-    .map((d) => ({ name: d.title, borrows: d.borrows, copies: d.copies, usageScore: d.usageScore, department: d.department }));
+    .map((d) => ({ name: d.title, borrows: d.borrows, copies: d.copies, copiesToAdd: d.copiesToAdd || 0, usageScore: d.usageScore, department: d.department }));
 
   const deptCopies = data.departments.map((d) => ({ department: d.department, copiesToAdd: d.copiesToAdd }));
 
@@ -103,7 +103,7 @@ function CollectionDecisions() {
           <div className="card border-0 shadow-sm h-100">
             <div className="card-header bg-white pt-3 px-3 border-bottom-0">
               <h6 className="fw-bold mb-0"><i className="bi bi-fire text-warning me-2"></i>High Demand Books — Add More Copies</h6>
-              <p className="text-muted small mb-0 mt-1">Top books needing additional copies. Hover a bar to see copies vs borrows.</p>
+              <p className="text-muted small mb-0 mt-1">Top books needing additional copies. Orange = demand (borrows), blue = copies to acquire.</p>
             </div>
             <div className="card-body pt-2">
               {highDemandBooks.length === 0 ? (
@@ -116,10 +116,17 @@ function CollectionDecisions() {
                     <YAxis type="category" dataKey="name" width={170} tick={{ fontSize: 11 }} />
                     <Tooltip
                       contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
-                      formatter={(value, name) => name === 'borrows' ? [`${value} borrows`, 'Total Borrows'] : [value, name]}
+                      formatter={(value, name) => {
+                        if (name === 'borrows') return [`${value}`, 'Total Borrows'];
+                        if (name === 'copiesToAdd') return [`${value}`, 'Copies to Acquire'];
+                        return [value, name];
+                      }}
+                      labelFormatter={(label) => `${label}`}
                     />
-                    <Bar dataKey="borrows" fill="#f59e0b" radius={[0, 4, 4, 0]} name="borrows">
-                      <LabelList dataKey="borrows" position="right" style={{ fontSize: 11 }} />
+                    <Legend />
+                    <Bar dataKey="borrows" fill="#f59e0b" radius={[0, 4, 4, 0]} name="borrows" />
+                    <Bar dataKey="copiesToAdd" fill="#6366f1" radius={[0, 4, 4, 0]} name="copiesToAdd">
+                      <LabelList dataKey="copiesToAdd" position="right" style={{ fontSize: 11, fill: '#6366f1' }} />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -239,6 +246,7 @@ function CollectionDecisions() {
                   <th className="small">Borrows</th>
                   <th className="small">Usage Score</th>
                   <th className="small">Copies</th>
+                  <th className="small">Copies to Add</th>
                   <th className="small">Condition</th>
                   <th className="small">Reason</th>
                   <th className="small">Actions</th>
@@ -258,6 +266,7 @@ function CollectionDecisions() {
                       <td>{item.borrows}</td>
                       <td>{item.usageScore}</td>
                       <td>{item.copies}</td>
+                      <td>{item.copiesToAdd > 0 ? <span className="fw-bold text-primary">{item.copiesToAdd}</span> : '—'}</td>
                       <td>{item.condition}</td>
                       <td className="text-muted small">{item.reason}</td>
                       <td style={{ minWidth: '150px' }}>

@@ -950,18 +950,22 @@ def collection_decisions():
         decision, color, reason = decision_for(item)
         stats[decision] = stats.get(decision, 0) + 1
         m = item.get('usageMetrics', {})
+        borrows = m.get('totalBorrows', 0)
+        copies = item.get('copies', 1)
+        copies_to_add = (max(1, borrows // 8 - copies + 1) if copies >= 1 else 1) if decision == 'Add More Copies' else 0
         decided.append({
             '_id': str(item['_id']),
             'title': item.get('title'),
             'author': item.get('author'),
             'department': item.get('department'),
             'category': item.get('category'),
-            'copies': item.get('copies', 1),
+            'copies': copies,
+            'copiesToAdd': copies_to_add,
             'condition': item.get('condition', 'New'),
             'publishYear': item.get('publishYear'),
             'cost': item.get('cost', 0),
             'cluster': item.get('cluster', -1),
-            'borrows': m.get('totalBorrows', 0),
+            'borrows': borrows,
             'usageScore': round(m.get('usageScore', 0), 2),
             'retentionScore': m.get('retentionScore', 0),
             'decision': decision,
