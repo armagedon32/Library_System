@@ -820,6 +820,85 @@ def similar_items(item_id):
     return jsonify(sims[:10])
 
 
+@analytics_bp.route('/recommend/for-me', methods=['GET'])
+@token_required
+def recommend_for_me():
+    """Personalized recommendations based on the user's frequently-borrowed categories/clusters."""
+    user = g.current_user
+    uid = ObjectId(user['_id'])
+
+    # Borrow history of this user
+    records = list(mongo.db.usagerecords.find({'user': uid}, {'collectionItem': 1}))
+    borrowed_ids = list({r['collectionItem'] for r in records if isinstance(r.get('collectionItem'), ObjectId)})
+    borrowed_items = list(mongo.db.collectionitems.find({'_id': {'$in': borrowed_ids}})) if borrowed_ids else []
+
+    if not borrowed_items:
+        # Cold start: recommend top performing books
+        top = list(mongo.db.collectionitems.find({'status': 'Active'})
+                   .sort('usageMetrics.usageScore', -1).limit(10))
+        return jsonify({'recommendations': [{
+            '_id': str(i['_id']), 'title': i.get('title'), 'author': i.get('author'),
+            'category': i.get('category'), 'department': i.get('department'),
+            'score': round(i.get('usageMetrics', {}).get('usageScore', 0), 2),
+            'reason': 'Popular among readers'
+        } for i in top], 'basedOn': 'popular'})
+
+    # Preference profile from history
+    cat_pref = {}
+    dept_pref = {}
+    author_pref = {}
+    for it in borrowed_items:
+        cat = it.get('category') or 'Other'
+        dept = it.get('department') or 'Ungrouped'
+        auth = it.get('author') or 'Unknown'
+        cat_pref[cat] = cat_pref.get(cat, 0) + 1
+        dept_pref[dept] = dept_pref.get(dept, 0) + 1
+        author_pref[auth] = author_pref.get(auth, 0) + 1
+    total = max(1, len(borrowed_items))
+
+    # Content-based: cosine similarity to a centroid of their borrowed docs
+    candidates = list(mongo.db.collectionitems.find({'status': 'Active', '_id': {'$nin': borrowed_ids}}))
+    if not candidates:
+        return jsonify({'recommendations': [], 'basedOn': 'history'})
+
+    all_items = borrowed_items + candidates
+    vectors, _ = build_document_vectors(all_items)
+    borrowed_vecs = [vectors.get(str(it['_id']), {}) for it in borrowed_items]
+    centroid = {}
+    if borrowed_vecs:
+        terms = set()
+        for v in borrowed_vecs:
+            terms.update(v.keys())
+        for t in terms:
+            centroid[t] = sum(v.get(t, 0) for v in borrowed_vecs) / len(borrowed_vecs)
+
+    recs = []
+    for item in candidates:
+        iv = vectors.get(str(item['_id']), {})
+        content_sim = cosine_similarity(centroid, iv)
+        cat_w = cat_pref.get(item.get('category') or 'Other', 0) / total
+        dept_w = dept_pref.get(item.get('department') or 'Ungrouped', 0) / total
+        auth_w = author_pref.get(item.get('author') or 'Unknown', 0) / total
+        score = (cat_w * 0.4 + dept_w * 0.25 + auth_w * 0.2 + content_sim * 0.15) * 100
+        if score <= 0:
+            continue
+        reasons = []
+        if cat_w > 0: reasons.append(f'Matches your frequent category ({item.get("category")})')
+        if dept_w > 0: reasons.append(f'From {item.get("department")}')
+        if auth_w > 0: reasons.append(f'By your favorite author ({item.get("author")})')
+        if content_sim > 0.1: reasons.append('Content similar to your past reads')
+        recs.append({
+            '_id': str(item['_id']), 'title': item.get('title'), 'author': item.get('author'),
+            'category': item.get('category'), 'department': item.get('department'),
+            'copies': item.get('copies', 1),
+            'score': round(score, 2),
+            'reason': ' · '.join(reasons[:2]) if reasons else 'Recommended for you'
+        })
+
+    recs.sort(key=lambda r: -r['score'])
+    return jsonify({'recommendations': recs[:10], 'basedOn': 'history', 'topCategories': sorted(cat_pref.items(), key=lambda x: -x[1])[:3]})
+
+
 @analytics_bp.route('/collection-decisions', methods=['GET'])
 @admin_required
 def collection_decisions():
