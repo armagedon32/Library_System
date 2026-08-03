@@ -834,7 +834,12 @@ def similar_items(item_id):
 def recommend_for_me():
     """Personalized recommendations based on the user's frequently-borrowed categories/clusters."""
     user = g.current_user
-    uid = ObjectId(user['_id'])
+    # Admins may view recommendations for a specific user via ?userId=
+    target_uid = request.args.get('userId')
+    if target_uid and user.get('role') == 'admin':
+        uid = ObjectId(target_uid)
+    else:
+        uid = ObjectId(user['_id'])
 
     # Borrow history of this user
     records = list(mongo.db.usagerecords.find({'user': uid}, {'collectionItem': 1}))

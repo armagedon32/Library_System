@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getUserClustering } from '../api/analytics';
+import { getUserClustering, getRecommendationsForMe } from '../api/analytics';
 import { useToast } from '../components/Toast';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 
@@ -9,6 +9,9 @@ function UserClustering() {
   const { addToast } = useToast();
   const [data, setData] = useState({ clusters: [], summary: [], totalUsers: 0 });
   const [loading, setLoading] = useState(true);
+  const [recUser, setRecUser] = useState(null);
+  const [recs, setRecs] = useState([]);
+  const [recLoading, setRecLoading] = useState(false);
 
   useEffect(() => {
     getUserClustering()
@@ -16,6 +19,20 @@ function UserClustering() {
       .catch(() => addToast('Failed to load user clusters', 'danger'))
       .finally(() => setLoading(false));
   }, []);
+
+  const viewRecommendations = async (u) => {
+    setRecUser(u);
+    setRecLoading(true);
+    setRecs([]);
+    try {
+      const d = await getRecommendationsForMe(u.userId);
+      setRecs(d.recommendations || []);
+    } catch (e) {
+      addToast('Failed to load recommendations', 'danger');
+    } finally {
+      setRecLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -101,6 +118,7 @@ function UserClustering() {
                   <th className="small">Overdue</th>
                   <th className="small">Categories</th>
                   <th className="small">Departments</th>
+                  <th className="small"></th>
                 </tr>
               </thead>
               <tbody>
@@ -114,6 +132,12 @@ function UserClustering() {
                     <td><span className={u.overdue > 0 ? 'text-danger fw-medium' : ''}>{u.overdue}</span></td>
                     <td>{u.categoriesBorrowed}</td>
                     <td>{u.departmentsBorrowed}</td>
+                    <td>
+                      <button className="btn btn-sm btn-outline-primary" onClick={() => viewRecommendations(u)}
+                        title="View recommended books for this user">
+                        <i className="bi bi-stars me-1"></i>Recommend
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -121,6 +145,57 @@ function UserClustering() {
           </div>
         </div>
       ))}
+
+      {recUser && (
+        <div className="modal d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+            <div className="modal-content border-0 shadow">
+              <div className="modal-header border-bottom-0 pb-0">
+                <h5 className="modal-title fw-bold"><i className="bi bi-stars me-2"></i>Recommended for {recUser.name}</h5>
+                <button type="button" className="btn-close" onClick={() => setRecUser(null)}></button>
+              </div>
+              <div className="modal-body">
+                {recLoading ? (
+                  <div className="text-center p-5">
+                    <div className="spinner-border text-primary" role="status"></div>
+                  </div>
+                ) : recs.length === 0 ? (
+                  <div className="text-center p-5 text-muted">
+                    <i className="bi bi-stars fs-1 d-block mb-2"></i>
+                    <span>No recommendations available for this user.</span>
+                  </div>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="table table-hover align-middle mb-0">
+                      <thead className="table-light">
+                        <tr>
+                          <th className="small">Title</th>
+                          <th className="small">Author</th>
+                          <th className="small">Category</th>
+                          <th className="small">Why</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {recs.map((r) => (
+                          <tr key={r._id}>
+                            <td className="fw-medium">{r.title}</td>
+                            <td className="text-muted">{r.author}</td>
+                            <td><span className="badge bg-primary bg-opacity-10 text-primary">{r.category}</span></td>
+                            <td className="text-muted small">{r.reason}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+              <div className="modal-footer border-top-0">
+                <button type="button" className="btn btn-light" onClick={() => setRecUser(null)}>Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

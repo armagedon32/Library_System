@@ -115,8 +115,8 @@ export const getTransactions = async (status = '') => {
   return response.data;
 };
 
-export const getRecommendationsForMe = async () => {
-  const response = await api.get('/analytics/recommend/for-me');
+export const getRecommendationsForMe = async (userId = null) => {
+  const response = await api.get('/analytics/recommend/for-me', { params: userId ? { userId } : {} });
   return response.data;
 };
 
