@@ -1,11 +1,15 @@
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
+import NotificationsBell from './NotificationsBell';
 
 function Layout() {
   return (
     <div className="d-flex min-vh-100 bg-light">
       <Sidebar />
       <div className="flex-grow-1" style={{ marginLeft: '260px' }}>
+        <div className="d-flex justify-content-end p-3 border-bottom bg-white">
+          <NotificationsBell />
+        </div>
         <div className="p-4">
           <Outlet />
         </div>

@@ -75,6 +75,31 @@ export const getUserClustering = async () => {
   return response.data;
 };
 
+export const reserveItem = async (itemId) => {
+  const response = await api.post(`/analytics/items/${itemId}/reserve`);
+  return response.data;
+};
+
+export const getMyReservations = async () => {
+  const response = await api.get('/analytics/reservations');
+  return response.data;
+};
+
+export const cancelReservation = async (reservationId) => {
+  const response = await api.delete(`/analytics/reservations/${reservationId}/cancel`);
+  return response.data;
+};
+
+export const getNotifications = async () => {
+  const response = await api.get('/analytics/notifications');
+  return response.data;
+};
+
+export const markNotificationsRead = async () => {
+  const response = await api.post('/analytics/notifications/read');
+  return response.data;
+};
+
 export const borrowItem = async (itemId, data = {}) => {
   const response = await api.post(`/analytics/items/${itemId}/borrow`, data);
   return response.data;

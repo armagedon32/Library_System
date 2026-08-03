@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { getMyUsage, returnItem, borrowItem, getCollectionItems } from '../api/analytics';
+import { getMyUsage, returnItem, borrowItem, getCollectionItems, reserveItem, getMyReservations, cancelReservation } from '../api/analytics';
 import BorrowModal from '../components/BorrowModal';
 import ReturnModal from '../components/ReturnModal';
 import { useToast } from '../components/Toast';
@@ -16,11 +16,33 @@ function UserDashboard() {
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [returnRecord, setReturnRecord] = useState(null);
   const [bookSearch, setBookSearch] = useState('');
+  const [reservations, setReservations] = useState([]);
 
   useEffect(() => {
     loadData();
     getCollectionItems({ status: 'Active', limit: 100 }).then(d => setAvailableItems(d.items || [])).catch(() => {});
+    getMyReservations().then(d => setReservations(d.reservations || [])).catch(() => {});
   }, []);
+
+  const handleReserve = async (item) => {
+    try {
+      await reserveItem(item._id);
+      addToast(`"${item.title}" reserved successfully!`, 'success');
+      getMyReservations().then(d => setReservations(d.reservations || [])).catch(() => {});
+    } catch (err) {
+      addToast(err.response?.data?.message || 'Failed to reserve', 'danger');
+    }
+  };
+
+  const handleCancelReserve = async (res) => {
+    try {
+      await cancelReservation(res._id);
+      addToast('Reservation cancelled', 'success');
+      setReservations(reservations.filter(r => r._id !== res._id));
+    } catch (err) {
+      addToast('Failed to cancel reservation', 'danger');
+    }
+  };
 
   const loadData = () => {
     setLoading(true);
@@ -188,6 +210,47 @@ function UserDashboard() {
       <div className="card border-0 shadow-sm mb-4">
         <div className="card-header bg-white border-bottom-0 pt-4 px-4">
           <div className="d-flex justify-content-between align-items-center">
+            <h6 className="fw-bold mb-0"><i className="bi bi-pin-angle me-2"></i>My Reservations</h6>
+            {reservations.length > 0 && <span className="badge bg-secondary">{reservations.length}</span>}
+          </div>
+        </div>
+        <div className="table-responsive">
+          <table className="table table-hover align-middle mb-0">
+            <thead className="table-light">
+              <tr>
+                <th className="small fw-semibold">Book</th>
+                <th className="small fw-semibold">Status</th>
+                <th className="small fw-semibold">Reserved</th>
+                <th className="small fw-semibold"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {reservations.length === 0 ? (
+                <tr><td colSpan="4" className="text-center text-muted py-4">No reservations yet.</td></tr>
+              ) : reservations.map((r) => (
+                <tr key={r._id}>
+                  <td className="fw-medium">{r.itemTitle}</td>
+                  <td>
+                    <span className={`badge ${r.status === 'ready' ? 'bg-success' : 'bg-info'}`}>
+                      {r.status === 'ready' ? 'Ready for pickup' : 'Waiting'}
+                    </span>
+                  </td>
+                  <td className="text-muted small">{new Date(r.createdAt).toLocaleDateString()}</td>
+                  <td>
+                    <button className="btn btn-sm btn-outline-danger" onClick={() => handleCancelReserve(r)}>
+                      <i className="bi bi-x-lg"></i>
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="card border-0 shadow-sm mb-4">
+        <div className="card-header bg-white border-bottom-0 pt-4 px-4">
+          <div className="d-flex justify-content-between align-items-center">
             <h6 className="fw-bold mb-0"><i className="bi bi-book me-2"></i>Available Books</h6>
             <div className="input-group input-group-sm" style={{ width: '250px' }}>
               <span className="input-group-text bg-white"><i className="bi bi-search"></i></span>
@@ -215,8 +278,11 @@ function UserDashboard() {
                   <td className="text-muted">{item.category}</td>
                   <td><span className="badge bg-info">{item.copies}</span></td>
                   <td>
-                    <button className="btn btn-sm btn-outline-primary" onClick={() => openBorrowForm(item)}>
+                    <button className="btn btn-sm btn-outline-primary me-1" onClick={() => openBorrowForm(item)}>
                       <i className="bi bi-bookmark-plus me-1"></i>Borrow
+                    </button>
+                    <button className="btn btn-sm btn-outline-warning" onClick={() => handleReserve(item)}>
+                      <i className="bi bi-pin-angle me-1"></i>Reserve
                     </button>
                   </td>
                 </tr>

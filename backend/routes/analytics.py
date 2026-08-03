@@ -342,7 +342,8 @@ def borrow_item(item_id):
             borrow_date = datetime.fromisoformat(data['borrowDate'])
         except: pass
 
-    due_date = borrow_date + timedelta(days=14)
+    policy = get_policies()
+    due_date = borrow_date + timedelta(days=int(policy['borrowing']['maxDays']))
     if data.get('dueDate'):
         try:
             due_date = datetime.fromisoformat(data['dueDate'])
@@ -365,6 +366,16 @@ def borrow_item(item_id):
         'isOverdue': False,
         'createdAt': datetime.utcnow()
     })
+
+    rem_days = get_policies()['notifications']['dueReminderDays']
+    schedule_due_reminder(user['_id'], item_id, due_date, rem_days)
+
+    # Clear an available reservation for this item once borrowed
+    if get_policies()['reservations']['enabled']:
+        claimed = mongo.db.reservations.find_one_and_delete(
+            {'item': ObjectId(item_id), 'user': ObjectId(user['_id']), 'status': {'$in': ['waiting', 'ready']}})
+        if claimed and str(claimed.get('readyAt')):
+            pass
 
     mongo.db.collectionitems.update_one(
         {'_id': ObjectId(item_id)},
@@ -401,13 +412,27 @@ def return_item(item_id):
 
     record = mongo.db.usagerecords.find_one_and_update(
         record_query,
-        {'$set': {'isReturned': True, 'returnDate': datetime.utcnow(), 'isOverdue': False}},
+        {'$set': {'isReturned': True, 'returnDate': datetime.utcnow()}},
         return_document=True
     )
     if not record:
         return jsonify({'message': 'No active borrow found for this item'}), 404
 
     dwell = (record['returnDate'] - record['borrowDate']).days
+
+    # Compute overdue fine from policy
+    policy = get_policies()
+    return_date = record['returnDate']
+    due_date = record.get('dueDate') or (record['borrowDate'] + timedelta(days=int(policy['borrowing']['maxDays'])))
+    overdue_days = max(0, (return_date - due_date).days - int(policy['fines']['graceDays']))
+    is_overdue = overdue_days > 0
+    fine = 0
+    if is_overdue and policy['fines']['enabled']:
+        fine = min(int(policy['fines']['maxFine']), overdue_days * int(policy['fines']['finePerDay']))
+
+    # Would-be reservation notification when an item is returned (availability)
+    if policy['reservations']['enabled'] and policy['notifications']['availabilityNotice']:
+        flag_reserved_item_availability(item_id)
 
     # Update return details
     is_damaged = data.get('isDamaged', False)
@@ -418,7 +443,10 @@ def return_item(item_id):
         'isDamaged': is_damaged,
         'damageDescription': data.get('damageDescription', ''),
         'missingCount': missing_count,
-        'returnNotes': data.get('notes', '')
+        'returnNotes': data.get('notes', ''),
+        'isOverdue': is_overdue,
+        'overdueDays': overdue_days,
+        'fineAmount': fine
     }
     mongo.db.usagerecords.update_one({'_id': record['_id']}, {'$set': return_updates})
 
@@ -469,7 +497,9 @@ def return_item(item_id):
     if is_damaged and missing_count > 0:
         status = f'returned with damage and {missing_count} missing'
 
-    return jsonify({'message': f'Item {status}', 'dwellTime': dwell, 'damaged': is_damaged, 'missingCount': missing_count})
+    return jsonify({'message': f'Item {status}', 'dwellTime': dwell, 'damaged': is_damaged,
+                    'missingCount': missing_count, 'overdue': is_overdue, 'overdueDays': overdue_days,
+                    'fineAmount': fine})
 
 
 @analytics_bp.route('/usage/borrowers', methods=['GET'])
@@ -829,14 +859,157 @@ def collection_decisions():
     })
 
 
+DEFAULT_SETTINGS = {
+    'borrowing': {'maxDays': 14, 'maxRenewals': 2, 'renewalDays': 7, 'minDaysBeforeRenew': 2},
+    'fines': {'enabled': True, 'finePerDay': 5, 'graceDays': 0, 'maxFine': 500},
+    'reservations': {'enabled': True, 'maxHoldDays': 3, 'reservationsPerUser': 3},
+    'notifications': {'dueReminderDays': 2, 'availabilityNotice': True, 'emailAlerts': False},
+    'clustering': {'maxClusters': 5, 'minItemsForClustering': 10, 'usageWeight': 0.4, 'retentionWeight': 0.3, 'dwellTimeWeight': 0.3},
+    'thresholds': {'retireThreshold': 2, 'keepThreshold': 8, 'flagThreshold': 5}
+}
+
+
+def get_policies():
+    """Merge stored settings with defaults."""
+    stored = mongo.db.settings.find_one({'_id': 'policy'})
+    if not stored:
+        return DEFAULT_SETTINGS
+    merged = dict(DEFAULT_SETTINGS)
+    stored.pop('_id', None)
+    for group, values in stored.items():
+        if isinstance(values, dict) and group in merged:
+            merged[group].update(values)
+        else:
+            merged[group] = values
+    return merged
+
+
+def create_notification(user_id, ntype, title, message, item_id=None):
+    mongo.db.notifications.insert_one({
+        'user': ObjectId(user_id),
+        'type': ntype,
+        'title': title,
+        'message': message,
+        'itemId': str(item_id) if item_id else None,
+        'isRead': False,
+        'createdAt': datetime.utcnow()
+    })
+
+
+def schedule_due_reminder(user_id, item_id, due_date, reminder_days=2):
+    mongo.db.notifications.insert_one({
+        'user': ObjectId(user_id),
+        'type': 'due_reminder',
+        'title': 'Upcoming due date',
+        'message': f'You borrowed an item due on {due_date.date()}. Please return before your due date.',
+        'itemId': str(item_id),
+        'isRead': False,
+        'notifyAt': due_date - timedelta(days=max(0, int(reminder_days))),
+        'createdAt': datetime.utcnow()
+    })
+
+
+def flag_reserved_item_availability(item_id):
+    """Notify the first waiting reservation that the item is now available."""
+    item = mongo.db.collectionitems.find_one({'_id': ObjectId(item_id)})
+    if not item:
+        return
+    waiting = list(mongo.db.reservations.find({'item': ObjectId(item_id), 'status': 'waiting'})
+                   .sort('createdAt', 1).limit(item.get('copies', 1)))
+    for res in waiting:
+        create_notification(
+            res['user'], 'available', 'Reserved book is available',
+            f'"{item.get("title")}" is now available. Please claim your reservation.',
+            item_id
+        )
+        mongo.db.reservations.update_one(
+            {'_id': ObjectId(res['_id'])},
+            {'$set': {'status': 'ready', 'readyAt': datetime.utcnow()}}
+        )
+
+
+@analytics_bp.route('/items/<item_id>/reserve', methods=['POST'])
+@token_required
+def reserve_item(item_id):
+    user = g.current_user
+    policy = get_policies()
+    if not policy['reservations']['enabled']:
+        return jsonify({'message': 'Reservations are currently disabled by the library'}), 400
+
+    item = mongo.db.collectionitems.find_one({'_id': ObjectId(item_id)})
+    if not item:
+        return jsonify({'message': 'Item not found'}), 404
+
+    active = mongo.db.usagerecords.count_documents({'collectionItem': ObjectId(item_id), 'isReturned': False})
+    existing = mongo.db.reservations.find_one({
+        'user': ObjectId(user['_id']), 'item': ObjectId(item_id), 'status': 'waiting'})
+    if existing:
+        return jsonify({'message': 'You already have an active reservation for this item'}), 400
+
+    user_reservations = mongo.db.reservations.count_documents(
+        {'user': ObjectId(user['_id']), 'status': 'waiting'})
+    if user_reservations >= int(policy['reservations']['reservationsPerUser']):
+        return jsonify({'message': 'Reservation limit reached'}), 400
+
+    mongo.db.reservations.insert_one({
+        'user': ObjectId(user['_id']),
+        'item': ObjectId(item_id),
+        'itemTitle': item.get('title'),
+        'status': 'waiting',
+        'createdAt': datetime.utcnow()
+    })
+    return jsonify({'message': f'"{item.get("title")}" added to reservation list'}), 201
+
+
+@analytics_bp.route('/reservations', methods=['GET'])
+@token_required
+def my_reservations():
+    user = g.current_user
+    res = list(mongo.db.reservations.find({'user': ObjectId(user['_id'])}).sort('createdAt', -1))
+    for r in res:
+        r['_id'] = str(r['_id'])
+        r['item'] = str(r['item'])
+    return jsonify({'reservations': res})
+
+
+@analytics_bp.route('/reservations/<res_id>/cancel', methods=['DELETE'])
+@token_required
+def cancel_reservation(res_id):
+    mongo.db.reservations.delete_one({'_id': ObjectId(res_id), 'user': ObjectId(g.current_user['_id'])})
+    return jsonify({'message': 'Reservation cancelled'})
+
+
+@analytics_bp.route('/notifications', methods=['GET'])
+@token_required
+def my_notifications():
+    user = g.current_user
+    unread = mongo.db.notifications.count_documents({'user': ObjectId(user['_id']), 'isRead': False})
+    nots = list(mongo.db.notifications.find({'user': ObjectId(user['_id'])}).sort('createdAt', -1).limit(30))
+    for n in nots:
+        n['_id'] = str(n['_id'])
+        if 'createdAt' in n and isinstance(n['createdAt'], datetime):
+            n['createdAt'] = n['createdAt'].isoformat()
+    return jsonify({'notifications': nots, 'unread': unread})
+
+
+@analytics_bp.route('/notifications/read', methods=['POST'])
+@token_required
+def mark_notifications_read():
+    mongo.db.notifications.update_many({'user': ObjectId(g.current_user['_id']), 'isRead': False}, {'$set': {'isRead': True}})
+    return jsonify({'message': 'All notifications marked as read'})
+
+
 @analytics_bp.route('/settings', methods=['GET'])
 @admin_required
 def get_settings():
-    return jsonify({'clustering': {'maxClusters': 5, 'minItemsForClustering': 10, 'usageWeight': 0.4, 'retentionWeight': 0.3, 'dwellTimeWeight': 0.3},
-                    'thresholds': {'retireThreshold': 2, 'keepThreshold': 8, 'flagThreshold': 5}})
+    return jsonify(get_policies())
 
 
 @analytics_bp.route('/settings', methods=['PUT'])
 @admin_required
 def update_settings():
-    return jsonify({'message': 'Settings updated', 'settings': request.get_json()})
+    data = request.get_json() or {}
+    doc = dict(data)
+    doc['_id'] = 'policy'
+    mongo.db.settings.replace_one({'_id': 'policy'}, doc, upsert=True)
+    return jsonify({'message': 'Settings updated', 'settings': get_policies()})
