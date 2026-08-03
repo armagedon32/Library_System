@@ -567,6 +567,123 @@ def similar_items(item_id):
     return jsonify(sims[:10])
 
 
+@analytics_bp.route('/collection-decisions', methods=['GET'])
+@admin_required
+def collection_decisions():
+    """Data-Driven Collection Decision Framework."""
+    items = list(mongo.db.collectionitems.find({}))
+    current_year = datetime.utcnow().year
+
+    def decision_for(item):
+        m = item.get('usageMetrics', {}) or {}
+        borrows = m.get('totalBorrows', 0)
+        usage = m.get('usageScore', 0)
+        copies = item.get('copies', 1)
+        condition = (item.get('condition') or 'New').lower()
+        pub_year = item.get('publishYear')
+        age = (current_year - pub_year) if isinstance(pub_year, int) else 0
+        cluster = item.get('cluster', -1)
+
+        if condition in ('damaged', 'poor', 'Repair Needed', 'unusable'):
+            return 'Repair / Replace', 'danger', f'Condition: {item.get("condition")}'
+        if borrows >= 8 and copies <= 2:
+            return 'Add More Copies', 'info', f'{copies} copie(s) vs {borrows} borrows'
+        if borrows >= 8:
+            return 'Retain', 'success', 'High performing item'
+        if cluster == -2 or (borrows == 0 and age < 5):
+            return 'Monitor', 'secondary', 'Newly acquired — track usage'
+        if borrows <= 2 and age >= 5:
+            return 'Weed / Deselect', 'danger', f'Low usage, {age} yrs old'
+        if borrows <= 2:
+            return 'Review', 'warning', f'Low usage ({borrows} borrows)'
+        return 'Retain', 'success', 'Adequate usage'
+
+    decided = []
+    stats = {}
+    for item in items:
+        decision, color, reason = decision_for(item)
+        stats[decision] = stats.get(decision, 0) + 1
+        m = item.get('usageMetrics', {})
+        decided.append({
+            '_id': str(item['_id']),
+            'title': item.get('title'),
+            'author': item.get('author'),
+            'department': item.get('department'),
+            'category': item.get('category'),
+            'copies': item.get('copies', 1),
+            'condition': item.get('condition', 'New'),
+            'publishYear': item.get('publishYear'),
+            'cost': item.get('cost', 0),
+            'cluster': item.get('cluster', -1),
+            'borrows': m.get('totalBorrows', 0),
+            'usageScore': round(m.get('usageScore', 0), 2),
+            'retentionScore': m.get('retentionScore', 0),
+            'decision': decision,
+            'decisionTone': color,
+            'reason': reason
+        })
+
+    order = ['Add More Copies', 'Retain', 'Repair / Replace', 'Review', 'Monitor', 'Weed / Deselect']
+    decided.sort(key=lambda d: order.index(d['decision']) if d['decision'] in order else 99)
+
+    # Framework evaluates the full catalog (regardless of manual status tag)
+    active = items
+    total_borrows = sum((i.get('usageMetrics') or {}).get('totalBorrows', 0) for i in active)
+    total_cost = sum(i.get('cost', 0) for i in active)
+    ages = [datetime.utcnow().year - i['publishYear'] for i in active if isinstance(i.get('publishYear'), int)]
+    avg_age = round(sum(ages) / len(ages), 1) if ages else 0
+
+    # Projected acquisition budget: copies to add per department for Add More Copies items
+    add_more = [d for d in decided if d['decision'] == 'Add More Copies']
+    budget_by_dept = {}
+    for d in add_more:
+        dept = d['department'] or 'Ungrouped'
+        need = max(1, d['borrows'] // 8 - d['copies'] + 1) if d['copies'] >= 1 else 1
+        budget_by_dept[dept] = {
+            'items': budget_by_dept.get(dept, {}).get('items', 0) + 1,
+            'copiesToAdd': budget_by_dept.get(dept, {}).get('copiesToAdd', 0) + need,
+        }
+
+    # Department coverage / gaps
+    dept_stats = []
+    dept_totals = {}
+    for i in items:
+        dept = i.get('department') or 'Ungategorized'
+        d = dept_totals.setdefault(dept, {'items': 0, 'borrows': 0})
+        d['items'] += 1
+        d['borrows'] += (i.get('usageMetrics') or {}).get('totalBorrows', 0)
+    avg_items = (sum(d['items'] for d in dept_totals.values()) / len(dept_totals)) if dept_totals else 0
+    for dept, d in dept_totals.items():
+        coverage = 'Low' if d['items'] < avg_items * 0.7 else ('Good' if d['items'] <= avg_items * 1.3 else 'High')
+        budget = budget_by_dept.get(dept, {})
+        dept_stats.append({
+            'department': dept,
+            'itemCount': d['items'],
+            'totalBorrows': d['borrows'],
+            'borrowRatio': round(d['borrows'] / d['items'], 1) if d['items'] else 0,
+            'coverage': coverage,
+            'copiesToAdd': budget.get('copiesToAdd', 0),
+        })
+
+    collection_summary = {
+        'totalItems': len(items),
+        'activeItems': len(active),
+        'totalBorrows': total_borrows,
+        'totalCost': round(total_cost, 2),
+        'avgAgeYears': avg_age,
+        'avgUsageScore': round(sum((i.get('usageMetrics') or {}).get('usageScore', 0) for i in active) / len(active), 2) if active else 0,
+    }
+
+    sorted_summary = [{'decision': k, 'count': v} for k, v in sorted(stats.items(), key=lambda x: -x[1])]
+
+    return jsonify({
+        'decisions': decided,
+        'summary': sorted_summary,
+        'collectionSummary': collection_summary,
+        'departments': dept_stats,
+    })
+
+
 @analytics_bp.route('/settings', methods=['GET'])
 @admin_required
 def get_settings():

@@ -65,6 +65,11 @@ export const getSimilarItems = async (id) => {
   return response.data;
 };
 
+export const getCollectionDecisions = async () => {
+  const response = await api.get('/analytics/collection-decisions');
+  return response.data;
+};
+
 export const borrowItem = async (itemId, data = {}) => {
   const response = await api.post(`/analytics/items/${itemId}/borrow`, data);
   return response.data;
