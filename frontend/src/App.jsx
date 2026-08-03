@@ -10,6 +10,7 @@ import ClusteringResults from './pages/ClusteringResults';
 import UserClustering from './pages/UserClustering';
 import Recommendations from './pages/Recommendations';
 import CollectionDecisions from './pages/CollectionDecisions';
+import Reservations from './pages/Reservations';
 import AdminSettings from './pages/AdminSettings';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -34,6 +35,7 @@ function App() {
           <Route path="user-clustering" element={<UserClustering />} />
           <Route path="recommendations" element={<Recommendations />} />
           <Route path="collection-decisions" element={<CollectionDecisions />} />
+          <Route path="reservations" element={<Reservations />} />
           {user?.role === 'admin' && <Route path="admin" element={<AdminSettings />} />}
         </Route>
       </Routes>

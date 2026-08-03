@@ -85,6 +85,11 @@ export const getMyReservations = async () => {
   return response.data;
 };
 
+export const getAllReservations = async () => {
+  const response = await api.get('/analytics/reservations/all');
+  return response.data;
+};
+
 export const cancelReservation = async (reservationId) => {
   const response = await api.delete(`/analytics/reservations/${reservationId}/cancel`);
   return response.data;

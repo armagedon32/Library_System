@@ -972,6 +972,30 @@ def my_reservations():
     return jsonify({'reservations': res})
 
 
+@analytics_bp.route('/reservations/all', methods=['GET'])
+@admin_required
+def all_reservations():
+    res = list(mongo.db.reservations.find({}).sort('createdAt', -1))
+    user_ids = [r['user'] for r in res if isinstance(r.get('user'), ObjectId)]
+    users_map = {}
+    for u in mongo.db.users.find({'_id': {'$in': user_ids}}, {'name': 1, 'email': 1, 'department': 1}):
+        users_map[u['_id']] = u
+    out = []
+    for r in res:
+        u = users_map.get(r.get('user'), {})
+        out.append({
+            '_id': str(r['_id']),
+            'userName': u.get('name', 'Unknown'),
+            'userEmail': u.get('email', ''),
+            'department': u.get('department', ''),
+            'itemTitle': r.get('itemTitle', ''),
+            'status': r.get('status', 'waiting'),
+            'createdAt': r.get('createdAt').isoformat() if isinstance(r.get('createdAt'), datetime) else None,
+            'readyAt': r.get('readyAt').isoformat() if isinstance(r.get('readyAt'), datetime) else None,
+        })
+    return jsonify({'reservations': out})
+
+
 @analytics_bp.route('/reservations/<res_id>/cancel', methods=['DELETE'])
 @token_required
 def cancel_reservation(res_id):
