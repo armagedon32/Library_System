@@ -564,6 +564,7 @@ def similar_items(item_id):
         sims.append({'_id': str(item['_id']), 'title': item.get('title'), 'author': item.get('author'),
                      'category': item.get('category'), 'department': item.get('department'), 'similarity': round(s, 4)})
     sims.sort(key=lambda x: x['similarity'], reverse=True)
+    sims = [s for s in sims if s['similarity'] > 0]
     return jsonify(sims[:10])
 
 
