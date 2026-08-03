@@ -25,7 +25,7 @@ def item_to_dict(item):
 @token_required
 def usage_summary():
     user = g.current_user
-    match = {'isReturned': True}
+    match = {}
     if user.get('role') != 'admin':
         match['user'] = ObjectId(user['_id'])
 
