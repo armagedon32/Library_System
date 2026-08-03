@@ -34,6 +34,15 @@ def usage_summary():
     if dept: match['department'] = dept
     if cat: match['category'] = {'$regex': cat, '$options': 'i'}
 
+    # Time-range filter (7d / 30d / 90d / 1y)
+    time_range = request.args.get('timeRange', '')
+    if time_range:
+        days_map = {'7d': 7, '30d': 30, '90d': 90, '1y': 365}
+        days = days_map.get(time_range)
+        if days:
+            cutoff = datetime.utcnow() - timedelta(days=days)
+            match['borrowDate'] = {'$gte': cutoff}
+
     usage_by_category = list(mongo.db.usagerecords.aggregate([
         {'$match': match},
         {'$lookup': {'from': 'collectionitems', 'localField': 'collectionItem', 'foreignField': '_id', 'as': 'item'}},
