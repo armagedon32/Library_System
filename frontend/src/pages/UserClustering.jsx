@@ -7,7 +7,7 @@ const COLORS = ['#6366f1', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6'];
 
 function UserClustering() {
   const { addToast } = useToast();
-  const [data, setData] = useState({ clusters: [], summary: [], totalUsers: 0 });
+  const [data, setData] = useState({ clusters: [], summary: [], totalUsers: 0, metrics: {} });
   const [loading, setLoading] = useState(true);
   const [recUser, setRecUser] = useState(null);
   const [recs, setRecs] = useState([]);
@@ -90,6 +90,87 @@ function UserClustering() {
                   <Bar dataKey="avgBorrows" fill="#6366f1" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="row g-4 mb-4">
+        <div className="col-lg-5">
+          <div className="card border-0 shadow-sm h-100">
+            <div className="card-header bg-white pt-4 px-4 border-bottom-0">
+              <h6 className="fw-bold mb-0">Clustering Validation Metrics</h6>
+              <small className="text-muted">Statistical validation of the segmentation quality</small>
+            </div>
+            <div className="card-body">
+              <div className="row g-3">
+                <div className="col-6">
+                  <div className="border rounded-3 p-3 text-center h-100">
+                    <div className="text-muted small fw-medium mb-1"><i className="bi bi-bounding-box me-1"></i>Silhouette Score</div>
+                    <div className={`display-6 fw-bold ${data.metrics.silhouette >= 0.5 ? 'text-success' : data.metrics.silhouette >= 0.25 ? 'text-primary' : 'text-warning'}`}>
+                      {data.metrics.silhouette != null ? data.metrics.silhouette.toFixed(4) : '—'}
+                    </div>
+                    <div className="small text-muted mt-1">
+                      {data.metrics.silhouette != null
+                        ? (data.metrics.silhouette >= 0.5 ? 'Strong separation' : data.metrics.silhouette >= 0.25 ? 'Moderate separation' : 'Weak separation')
+                        : 'Not computed'}
+                    </div>
+                  </div>
+                </div>
+                <div className="col-6">
+                  <div className="border rounded-3 p-3 text-center h-100">
+                    <div className="text-muted small fw-medium mb-1"><i className="bi bi-diagram-3 me-1"></i>Davies–Bouldin Index</div>
+                    <div className={`display-6 fw-bold ${data.metrics.daviesBouldin != null && data.metrics.daviesBouldin < 1 ? 'text-success' : 'text-warning'}`}>
+                      {data.metrics.daviesBouldin != null ? data.metrics.daviesBouldin.toFixed(4) : '—'}
+                    </div>
+                    <div className="small text-muted mt-1">
+                      {data.metrics.daviesBouldin != null
+                        ? (data.metrics.daviesBouldin < 1 ? 'Compact clusters' : 'High overlap')
+                        : 'Not computed'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <p className="text-muted small mb-0 mt-3">
+                Silhouette Score ranges from −1 to 1 (higher = clusters are well separated). The Davies–Bouldin Index is lower-is-better (clusters are compact and far apart). K = {data.k ?? data.metrics.k}.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="col-lg-7">
+          <div className="card border-0 shadow-sm h-100">
+            <div className="card-header bg-white pt-4 px-4 border-bottom-0">
+              <h6 className="fw-bold mb-0"><i className="bi bi-table me-2"></i>Cluster Characteristics</h6>
+              <small className="text-muted">Average behavioral profile per segment</small>
+            </div>
+            <div className="table-responsive">
+              <table className="table table-hover align-middle mb-0">
+                <thead className="table-light">
+                  <tr>
+                    <th className="small fw-semibold">Cluster</th>
+                    <th className="small fw-semibold">Users</th>
+                    <th className="small fw-semibold">Avg Borrows</th>
+                    <th className="small fw-semibold">Avg Renewals</th>
+                    <th className="small fw-semibold">Avg Dwell (days)</th>
+                    <th className="small fw-semibold">Avg Overdue</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.summary.map((s, idx) => (
+                    <tr key={s.cluster}>
+                      <td>
+                        <span className="badge me-2" style={{ backgroundColor: COLORS[idx % COLORS.length] }}>{s.label}</span>
+                        <span className="text-muted small">{s.cluster >= 0 ? `(Cluster ${s.cluster})` : 'No Activity'}</span>
+                      </td>
+                      <td className="fw-medium">{s.count}</td>
+                      <td>{s.avgBorrows}</td>
+                      <td>{s.avgRenewals != null ? s.avgRenewals : '—'}</td>
+                      <td>{s.avgDwell}</td>
+                      <td>{s.avgOverdue != null ? s.avgOverdue : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

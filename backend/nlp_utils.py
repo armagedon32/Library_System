@@ -246,6 +246,14 @@ def run_kmeans(items, k):
 
 def kmeans_feature(points, k):
     """Generic K-Means over numeric feature vectors. points: list of dicts {'id': str, 'features': [..]}."""
+    res = kmeans_feature_full(points, k)
+    if not res:
+        return None
+    return res['assignments']
+
+
+def kmeans_feature_full(points, k):
+    """K-Means returning assignments plus normalized vectors & centroids for validation metrics."""
     if not points or len(points) < k:
         return None
 
@@ -290,4 +298,63 @@ def kmeans_feature(points, k):
             if members:
                 centroids[ci] = [sum(m[j] for m in members) / len(members) for j in range(len(members[0]))]
 
-    return [{'id': ids[i], 'cluster': labels[i]} for i in range(n)]
+    return {
+        'assignments': [{'id': ids[i], 'cluster': labels[i]} for i in range(n)],
+        'labels': labels,
+        'normalized': norm,
+        'centroids': centroids,
+    }
+
+
+def silhouette_score(points, labels):
+    """Mean Silhouette coefficient in [-1, 1]. Higher is better (well-separated clusters)."""
+    n = len(points)
+    unique_labels = set(labels)
+    if n < 2 or len(unique_labels) < 2:
+        return None
+    total = 0.0
+    for i in range(n):
+        same = [points[j] for j in range(n) if j != i and labels[j] == labels[i]]
+        if not same:
+            continue
+        a = math.sqrt(sum((points[i][d] - s[d]) ** 2 for s in same for d in range(len(points[i]))) / len(same))
+        b = float('inf')
+        for cl in unique_labels:
+            if cl == labels[i]:
+                continue
+            others = [points[j] for j in range(n) if labels[j] == cl]
+            if not others:
+                continue
+            b = min(b, math.sqrt(sum((points[i][d] - o[d]) ** 2 for o in others for d in range(len(points[i]))) / len(others)))
+        if b == float('inf'):
+            continue
+        total += (b - a) / max(a, b)
+    return total / n
+
+
+def davies_bouldin_index(points, labels):
+    """Davies-Bouldin Index. Lower is better (compact, well-separated clusters)."""
+    clusters = sorted(set(labels))
+    if len(clusters) < 2 or not points:
+        return None
+    centroids = {}
+    for cl in clusters:
+        members = [points[i] for i in range(len(points)) if labels[i] == cl]
+        centroids[cl] = [sum(m[d] for m in members) / len(members) for d in range(len(members[0]))]
+    scatters = {}
+    for cl in clusters:
+        members = [points[i] for i in range(len(points)) if labels[i] == cl]
+        c = centroids[cl]
+        scatters[cl] = math.sqrt(sum(sum((m[d] - c[d]) ** 2 for d in range(len(m))) for m in members) / len(members))
+    db = 0.0
+    for i, cl in enumerate(clusters):
+        max_val = 0.0
+        for j, cl2 in enumerate(clusters):
+            if i == j:
+                continue
+            dist = math.sqrt(sum((centroids[cl][d] - centroids[cl2][d]) ** 2 for d in range(len(centroids[cl]))))
+            if dist == 0:
+                continue
+            max_val = max(max_val, (scatters[cl] + scatters[cl2]) / dist)
+        db += max_val
+    return db / len(clusters)

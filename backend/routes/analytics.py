@@ -5,7 +5,7 @@ import re
 import math
 from middleware import token_required, admin_required
 from db import mongo
-from nlp_utils import classify_category, classify_department, run_kmeans, build_document_vectors, cosine_similarity, kmeans_feature
+from nlp_utils import classify_category, classify_department, run_kmeans, build_document_vectors, cosine_similarity, kmeans_feature, kmeans_feature_full, silhouette_score, davies_bouldin_index
 from activity import log_activity
 
 analytics_bp = Blueprint('analytics', __name__)
@@ -758,11 +758,18 @@ def user_clustering():
     # Only cluster users with at least 1 borrow
     active_points = [p for p in points if p['features'][0] > 0]
     clusters_map = {}
+    metrics = {'silhouette': None, 'daviesBouldin': None, 'k': 0}
     if len(active_points) >= 3:
         k = 2 if len(active_points) < 6 else 3
-        res = kmeans_feature(active_points, k)
+        res = kmeans_feature_full(active_points, k)
         if res:
-            clusters_map = {c['id']: c['cluster'] for c in res}
+            clusters_map = {c['id']: c['cluster'] for c in res['assignments']}
+            unique = list(set(res['labels']))
+            metrics['k'] = len(unique)
+            sil = silhouette_score(res['normalized'], res['labels'])
+            dbi = davies_bouldin_index(res['normalized'], res['labels'])
+            metrics['silhouette'] = round(sil, 4) if sil is not None else None
+            metrics['daviesBouldin'] = round(dbi, 4) if dbi is not None else None
 
     # Assign cluster + interpret as segment
     for seg in segments:
@@ -802,13 +809,15 @@ def user_clustering():
         summary.append({
             'cluster': cl, 'label': label, 'count': len(members),
             'avgBorrows': round(sum(m['totalBorrows'] for m in members) / len(members), 1),
+            'avgRenewals': round(sum(m['totalRenewals'] for m in members) / len(members), 1),
             'avgDwell': round(sum(m['avgDwellTime'] for m in members) / len(members), 1),
+            'avgOverdue': round(sum(m['overdue'] for m in members) / len(members), 1),
             'overdueTotal': sum(m['overdue'] for m in members),
             'segments': segment_members(segments, cl)
         })
     summary.sort(key=lambda s: s['cluster'])
 
-    return jsonify({'clusters': segments, 'summary': summary, 'totalUsers': len(segments), 'k': len([c for c in [0, 1, 2] if clusters_map])})
+    return jsonify({'clusters': segments, 'summary': summary, 'totalUsers': len(segments), 'k': len([c for c in [0, 1, 2] if clusters_map]), 'metrics': metrics})
 
 
 @analytics_bp.route('/recommend/similar/<item_id>', methods=['GET'])
