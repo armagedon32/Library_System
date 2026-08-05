@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import Logo from './Logo';
 
 function Sidebar() {
   const { user, logout } = useAuth();
@@ -27,8 +28,8 @@ function Sidebar() {
     <div className="d-flex flex-column" style={{ width: '260px', minHeight: '100vh', backgroundColor: '#1e293b' }}>
       <div className="p-4 border-bottom" style={{ borderColor: '#334155 !important' }}>
         <div className="d-flex align-items-center">
-          <div className="d-inline-flex align-items-center justify-content-center bg-primary rounded-2 me-2" style={{ width: '36px', height: '36px' }}>
-            <i className="bi bi-book text-white"></i>
+          <div className="d-inline-flex align-items-center justify-content-center bg-white rounded-2 me-2 p-1" style={{ width: '36px', height: '36px' }}>
+            <Logo size={30} />
           </div>
           <div>
             <h6 className="text-white fw-bold mb-0" style={{ fontSize: '0.95rem' }}>Library System</h6>

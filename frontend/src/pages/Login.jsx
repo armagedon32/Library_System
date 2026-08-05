@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { login } from '../api/auth';
+import Logo from '../components/Logo';
 
 function Login() {
   const [formData, setFormData] = useState({ email: '', password: '' });
@@ -30,8 +31,8 @@ function Login() {
       <div className="card shadow-sm border-0" style={{ width: '420px', borderRadius: '12px' }}>
         <div className="card-body p-5">
           <div className="text-center mb-4">
-            <div className="d-inline-flex align-items-center justify-content-center bg-dark text-white rounded-3 mb-3" style={{ width: '48px', height: '48px' }}>
-              <i className="bi bi-book fs-5"></i>
+            <div className="d-inline-flex align-items-center justify-content-center bg-white border rounded-3 mb-3 p-2" style={{ width: '64px', height: '64px' }}>
+              <Logo size={48} />
             </div>
             <h4 className="fw-bold mb-1">Library System</h4>
             <p className="text-muted small mb-0">Sign in to your account</p>
