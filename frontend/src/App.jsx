@@ -15,6 +15,7 @@ import Reservations from './pages/Reservations';
 import ActivityLog from './pages/ActivityLog';
 import Transactions from './pages/Transactions';
 import Settings from './pages/Settings';
+import Reports from './pages/Reports';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -37,6 +38,7 @@ function App() {
           <Route path="settings" element={<Settings />} />
           <Route path="items" element={<CollectionItems />} />
           <Route path="clustering" element={<ClusteringResults />} />
+          <Route path="reports" element={<Reports />} />
           <Route path="user-clustering" element={<UserClustering />} />
           <Route path="recommendations" element={<Recommendations />} />
           <Route path="collection-decisions" element={<CollectionDecisions />} />

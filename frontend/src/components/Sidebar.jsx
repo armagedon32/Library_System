@@ -18,6 +18,7 @@ function Sidebar() {
     navItems.push({ to: '/dashboard/activity', label: 'Activity Log', icon: 'bi-clock-history' });
     navItems.push({ to: '/dashboard/recommendations', label: 'Recommendations', icon: 'bi-lightbulb' });
     navItems.push({ to: '/dashboard/collection-decisions', label: 'Collection Framework', icon: 'bi-clipboard-data' });
+    navItems.push({ to: '/dashboard/reports', label: 'Reports', icon: 'bi-file-earmark-bar-graph' });
   }
 
   navItems.push({ to: '/dashboard/settings', label: 'Settings', icon: 'bi-gear' });
