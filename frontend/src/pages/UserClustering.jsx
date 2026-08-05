@@ -54,10 +54,10 @@ function UserClustering() {
       </div>
 
       <div className="row g-4 mb-4">
-        <div className="col-lg-5">
+        <div className="col-md-4">
           <div className="card border-0 shadow-sm h-100">
             <div className="card-header bg-white pt-4 px-4 border-bottom-0">
-              <h6 className="fw-bold mb-0">User Distribution by Cluster</h6>
+              <h6 className="fw-bold mb-0">Cluster Distribution</h6>
               <small className="text-muted">Total users: {data.totalUsers}</small>
             </div>
             <div className="card-body">
@@ -74,7 +74,27 @@ function UserClustering() {
             </div>
           </div>
         </div>
-        <div className="col-lg-7">
+        <div className="col-md-4">
+          <div className="card border-0 shadow-sm h-100">
+            <div className="card-header bg-white pt-4 px-4 border-bottom-0">
+              <h6 className="fw-bold mb-0">User Distribution by Cluster</h6>
+              <small className="text-muted">Number of users per cluster</small>
+            </div>
+            <div className="card-body">
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={data.summary}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="label" />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="count" name="Users" fill="#10b981" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+        <div className="col-md-4">
           <div className="card border-0 shadow-sm h-100">
             <div className="card-header bg-white pt-4 px-4 border-bottom-0">
               <h6 className="fw-bold mb-0">Average Borrows per Cluster</h6>
@@ -87,7 +107,7 @@ function UserClustering() {
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Bar dataKey="avgBorrows" fill="#6366f1" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="avgBorrows" name="Avg Borrows" fill="#6366f1" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
