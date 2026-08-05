@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { getUsageSummary, getBorrowerAnalytics } from '../api/analytics';
+import { Link } from 'react-router-dom';
+import { getUsageSummary, getBorrowerAnalytics, getClusteringResults } from '../api/analytics';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line
@@ -10,6 +11,7 @@ const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6'
 function AnalyticsDashboard() {
   const [summary, setSummary] = useState(null);
   const [borrowers, setBorrowers] = useState({ top: [], all: [] });
+  const [clusterSummary, setClusterSummary] = useState([]);
   const [borrowerSearch, setBorrowerSearch] = useState('');
   const [allSearch, setAllSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -20,10 +22,12 @@ function AnalyticsDashboard() {
     setLoading(true);
     Promise.all([
       getUsageSummary({ timeRange, ...(showAllItems ? { topLimit: 1000 } : {}) }).catch(() => null),
-      getBorrowerAnalytics().catch(() => ({ top: [], all: [] }))
-    ]).then(([s, b]) => {
+      getBorrowerAnalytics().catch(() => ({ top: [], all: [] })),
+      getClusteringResults().catch(() => ({ summary: [] }))
+    ]).then(([s, b, c]) => {
       setSummary(s);
       setBorrowers(b || { top: [], all: [] });
+      setClusterSummary((c && c.summary) || []);
     }).finally(() => setLoading(false));
   }, [timeRange, showAllItems]);
 
@@ -125,6 +129,72 @@ function AnalyticsDashboard() {
                   <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }} />
                 </PieChart>
               </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="row g-3 mb-4">
+        <div className="col-md-5">
+          <div className="card border-0 shadow-sm h-100">
+            <div className="card-header bg-white border-bottom-0 pt-4 px-4">
+              <div className="d-flex justify-content-between align-items-center">
+                <h6 className="fw-bold mb-0"><i className="bi bi-diagram-3 me-2"></i>Book Cluster Distribution</h6>
+                <Link to="/dashboard/clustering" className="btn btn-link btn-sm text-decoration-none p-0">View Details</Link>
+              </div>
+              <p className="text-muted small mb-0 mt-1">Distribution of collection items across K-Means clusters</p>
+            </div>
+            <div className="card-body">
+              <ResponsiveContainer width="100%" height={260}>
+                <PieChart>
+                  <Pie
+                    data={clusterSummary.map((c) => ({ name: `Cluster ${c._id}`, value: c.count }))}
+                    cx="50%" cy="50%" labelLine={false}
+                    label={({ name, value }) => `${name}: ${value}`}
+                    outerRadius={95} dataKey="value"
+                  >
+                    {clusterSummary.map((_, index) => (
+                      <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+        <div className="col-md-7">
+          <div className="card border-0 shadow-sm h-100">
+            <div className="card-header bg-white border-bottom-0 pt-4 px-4">
+              <h6 className="fw-bold mb-0"><i className="bi bi-table me-2"></i>Book Clusters Overview</h6>
+            </div>
+            <div className="table-responsive">
+              <table className="table table-hover align-middle mb-0">
+                <thead className="table-light">
+                  <tr>
+                    <th className="small fw-semibold">Cluster</th>
+                    <th className="small fw-semibold">Books</th>
+                    <th className="small fw-semibold">Avg Usage Score</th>
+                    <th className="small fw-semibold">Avg Retention</th>
+                    <th className="small fw-semibold">Avg Borrows</th>
+                    <th className="small fw-semibold">Avg Dwell (days)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {clusterSummary.length === 0 ? (
+                    <tr><td colSpan="6" className="text-center text-muted py-4">No clustering results yet. Open the Book Clustering page to run K-Means.</td></tr>
+                  ) : clusterSummary.map((c) => (
+                    <tr key={c._id}>
+                      <td><span className="badge bg-dark">Cluster {c._id}</span></td>
+                      <td className="fw-medium">{c.count}</td>
+                      <td>{Number(c.avgUsageScore || 0).toFixed(2)}</td>
+                      <td>{Number(c.avgRetentionScore || 0).toFixed(2)}</td>
+                      <td>{Number(c.avgBorrows || 0).toFixed(2)}</td>
+                      <td className="text-muted">{Number(c.avgDwellTime || 0).toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

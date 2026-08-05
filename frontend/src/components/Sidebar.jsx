@@ -13,6 +13,7 @@ function Sidebar() {
   if (user?.role === 'admin') {
     navItems[1] = { to: '/dashboard/transactions', label: 'Transactions', icon: 'bi-arrow-left-right' };
     navItems.push({ to: '/dashboard/user-clustering', label: 'User Segmentation', icon: 'bi-people' });
+    navItems.push({ to: '/dashboard/clustering', label: 'Book Clustering', icon: 'bi-diagram-3' });
     navItems.push({ to: '/dashboard/reservations', label: 'Reservations', icon: 'bi-pin-angle' });
     navItems.push({ to: '/dashboard/activity', label: 'Activity Log', icon: 'bi-clock-history' });
     navItems.push({ to: '/dashboard/recommendations', label: 'Recommendations', icon: 'bi-lightbulb' });
