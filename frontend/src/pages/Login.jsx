@@ -31,8 +31,8 @@ function Login() {
       <div className="card shadow-sm border-0" style={{ width: '420px', borderRadius: '12px' }}>
         <div className="card-body p-5">
           <div className="text-center mb-4">
-            <div className="d-inline-flex align-items-center justify-content-center bg-white border rounded-3 mb-3 p-2" style={{ width: '64px', height: '64px' }}>
-              <Logo size={48} />
+            <div className="d-inline-flex align-items-center justify-content-center bg-white border rounded-3 mb-3 p-3" style={{ width: '96px', height: '96px' }}>
+              <Logo size={80} />
             </div>
             <h4 className="fw-bold mb-1">Library System</h4>
             <p className="text-muted small mb-0">Sign in to your account</p>
