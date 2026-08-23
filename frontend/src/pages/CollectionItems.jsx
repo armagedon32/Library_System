@@ -8,6 +8,7 @@ import { useToast } from '../components/Toast';
 function CollectionItems() {
   const { addToast } = useToast();
   const [items, setItems] = useState([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState({ department: '', category: '', status: '' });
@@ -33,6 +34,7 @@ function CollectionItems() {
       Object.keys(params).forEach(k => { if (!params[k]) delete params[k]; });
       const data = await getCollectionItems(params);
       setItems(data.items);
+      setTotal(data.total);
     } catch (error) {
       console.error('Failed to load items:', error);
     } finally {
@@ -111,7 +113,7 @@ function CollectionItems() {
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
-          <h4 className="fw-bold mb-1">Collection Items</h4>
+          <h4 className="fw-bold mb-1">Collection Items <span className="badge bg-primary fs-6">{total}</span></h4>
           <p className="text-muted small mb-0">Manage and monitor library collection performance</p>
         </div>
         <button className="btn btn-dark btn-sm" onClick={() => setShowModal(true)}>
