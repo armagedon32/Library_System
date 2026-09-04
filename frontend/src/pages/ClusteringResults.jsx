@@ -96,6 +96,43 @@ function ClusteringResults() {
       {summary.length > 0 && (
         <div className="card border-0 shadow-sm mb-4">
           <div className="card-header bg-white pt-4 px-4 border-bottom-0">
+            <h6 className="fw-bold mb-0"><i className="bi bi-gear-wide-connected me-2"></i>Clustering Attributes</h6>
+            <small className="text-muted">Attributes used for K-Means clustering of collection items</small>
+          </div>
+          <div className="card-body">
+            <div className="row g-3">
+              <div className="col-md-6">
+                <h6 className="small fw-semibold text-muted mb-2">Usage Metrics</h6>
+                <ul className="list-unstyled mb-0 small">
+                  <li><i className="bi bi-check-circle-fill text-success me-2"></i>Borrowing Frequency (Total Borrows)</li>
+                  <li><i className="bi bi-check-circle-fill text-success me-2"></i>Renewal Frequency (Total Renewals)</li>
+                  <li><i className="bi bi-check-circle-fill text-success me-2"></i>Average Dwell Time</li>
+                  <li><i className="bi bi-check-circle-fill text-success me-2"></i>Usage Score (computed)</li>
+                  <li><i className="bi bi-check-circle-fill text-success me-2"></i>Retention Score</li>
+                </ul>
+              </div>
+              <div className="col-md-6">
+                <h6 className="small fw-semibold text-muted mb-2">Content Features</h6>
+                <ul className="list-unstyled mb-0 small">
+                  <li><i className="bi bi-check-circle-fill text-success me-2"></i>Title (TF-IDF)</li>
+                  <li><i className="bi bi-check-circle-fill text-success me-2"></i>Description (TF-IDF)</li>
+                  <li><i className="bi bi-check-circle-fill text-success me-2"></i>Top 10 TF-IDF Terms</li>
+                </ul>
+              </div>
+            </div>
+            <div className="mt-3">
+              <small className="text-muted">
+                <strong>Total:</strong> 13 features (3 Usage Metrics + 10 TF-IDF Content Features)<br />
+                <strong>Normalization:</strong> Min-Max scaling to [0, 1] range
+              </small>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {summary.length > 0 && (
+        <div className="card border-0 shadow-sm mb-4">
+          <div className="card-header bg-white pt-4 px-4 border-bottom-0">
             <h6 className="fw-bold mb-0"><i className="bi bi-table me-2"></i>Cluster Summary</h6>
           </div>
           <div className="card-body">
