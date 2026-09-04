@@ -19,6 +19,7 @@ function CollectionItems() {
   const [borrowItemData, setBorrowItemData] = useState(null);
   const [showSimilarModal, setShowSimilarModal] = useState(false);
   const [similarItemData, setSimilarItemData] = useState(null);
+  const [viewMode, setViewMode] = useState('list');
   const debounceRef = useRef(null);
 
   useEffect(() => {
@@ -112,6 +113,116 @@ function CollectionItems() {
     return map[status] || 'bg-secondary';
   };
 
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <div className="text-center p-5">
+          <div className="spinner-border text-primary" role="status"></div>
+        </div>
+      );
+    }
+    if (items.length === 0) {
+      return (
+        <div className="text-center p-5 text-muted">
+          <i className="bi bi-book fs-1 d-block mb-2"></i>
+          <span>No items found</span>
+        </div>
+      );
+    }
+    return (
+      <div>
+        {viewMode === 'list' ? (
+          <div className="table-responsive">
+            <table className="table table-hover align-middle mb-0">
+              <thead className="table-light">
+                <tr>
+                  <th className="small fw-semibold">Accession No.</th>
+                  <th className="small fw-semibold">Title</th>
+                  <th className="small fw-semibold">Author</th>
+                  <th className="small fw-semibold">ISBN</th>
+                  <th className="small fw-semibold">Year</th>
+                  <th className="small fw-semibold">Publisher</th>
+                  <th className="small fw-semibold">Category</th>
+                  <th className="small fw-semibold">Department</th>
+                  <th className="small fw-semibold">Status</th>
+                  <th className="small fw-semibold">Borrows</th>
+                  <th className="small fw-semibold">Usage Score</th>
+                  <th className="small fw-semibold">Cluster</th>
+                  <th className="small fw-semibold"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => (
+                  <tr key={item._id}>
+                    <td className="text-muted small fw-medium">{item.accessionNumber || '-'}</td>
+                    <td className="fw-medium">{item.title}</td>
+                    <td className="text-muted">{item.author}</td>
+                    <td className="text-muted small">{item.isbn}</td>
+                    <td className="text-muted">{item.publishYear}</td>
+                    <td className="text-muted">{item.publisher}</td>
+                    <td className="text-muted">{item.category}</td>
+                    <td className="text-muted">{item.department}</td>
+                    <td><span className={`badge ${statusBadge(item.status)}`}>{item.status}</span></td>
+                    <td>{item.usageMetrics.totalBorrows}</td>
+                    <td>{item.usageMetrics.usageScore.toFixed(2)}</td>
+                    <td>{item.cluster === -2 ? <span className="badge bg-secondary">New</span> : (item.cluster === -1 ? <span className="badge bg-warning text-dark">Not Yet Clustered</span> : <span className="badge bg-success">Clustered</span>)}</td>
+                    <td>
+                      <button className="btn btn-sm btn-outline-primary" onClick={() => openBorrowForm(item)}
+                        disabled={item.copies < 1} title={item.copies < 1 ? 'No copies available' : 'Borrow this item'}>
+                        <i className="bi bi-bookmark-plus"></i>
+                      </button>
+                      <button className="btn btn-sm btn-outline-secondary ms-1 me-1" onClick={() => openSimilar(item)}
+                        title="View similar books">
+                        <i className="bi bi-shuffle"></i>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="row g-3">
+            {items.map((item) => (
+              <div key={item._id} className="col-12 col-sm-6 col-md-4 col-lg-3">
+                <div className="card border-0 shadow-sm h-100">
+                  <div className="bg-light text-center p-4" style={{ minHeight: '180px', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                    {item.coverImage ? (
+                      <img src={item.coverImage} alt={item.title} className="img-fluid" style={{ maxHeight: '160px' }} />
+                    ) : (
+                      <i className="bi bi-book fs-1 text-muted"></i>
+                    )}
+                  </div>
+                  <div className="card-body p-3">
+                    <h6 className="fw-bold mb-1 text-truncate" title={item.title}>{item.title}</h6>
+                    <small className="text-muted d-block mb-1">{item.author}</small>
+                    <div className="d-flex flex-wrap gap-1 mb-2">
+                      <span className="badge bg-light text-dark">{item.department}</span>
+                      <span className="badge bg-light text-dark">{item.category}</span>
+                    </div>
+                    <div className="d-flex justify-content-between align-items-center">
+                      <small className="text-muted">{item.accessionNumber || '-'}</small>
+                      <span className={`badge ${statusBadge(item.status)}`}>{item.status}</span>
+                    </div>
+                    <div className="d-flex gap-1 mt-2">
+                      <button className="btn btn-sm btn-outline-primary flex-fill" onClick={() => openBorrowForm(item)}
+                        disabled={item.copies < 1} title={item.copies < 1 ? 'No copies available' : 'Borrow'}>
+                        <i className="bi bi-bookmark-plus"></i>
+                      </button>
+                      <button className="btn btn-sm btn-outline-secondary" onClick={() => openSimilar(item)} title="Similar">
+                        <i className="bi bi-shuffle"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
@@ -123,6 +234,14 @@ function CollectionItems() {
           <i className="bi bi-plus-lg me-1"></i>Add Item
         </button>
         <div className="d-flex gap-2">
+          <div className="btn-group btn-group-sm" role="group">
+            <button type="button" className={`btn ${viewMode === 'list' ? 'btn-dark' : 'btn-outline-dark'}`} onClick={() => setViewMode('list')}>
+              <i className="bi bi-list-ul"></i>
+            </button>
+            <button type="button" className={`btn ${viewMode === 'grid' ? 'btn-dark' : 'btn-outline-dark'}`} onClick={() => setViewMode('grid')}>
+              <i className="bi bi-grid-3x3-gap-fill"></i>
+            </button>
+          </div>
           <label className="btn btn-outline-secondary btn-sm">
             <i className="bi bi-upload me-1"></i>Upload CSV
             <input type="file" accept=".csv" className="d-none" onChange={handleUpload} />
@@ -202,54 +321,95 @@ function CollectionItems() {
             <span>No items found</span>
           </div>
         ) : (
-          <div className="table-responsive">
-            <table className="table table-hover align-middle mb-0">
-              <thead className="table-light">
-                <tr>
-                  <th className="small fw-semibold">Accession No.</th>
-                  <th className="small fw-semibold">Title</th>
-                  <th className="small fw-semibold">Author</th>
-                  <th className="small fw-semibold">ISBN</th>
-                  <th className="small fw-semibold">Year</th>
-                  <th className="small fw-semibold">Publisher</th>
-                  <th className="small fw-semibold">Category</th>
-                  <th className="small fw-semibold">Department</th>
-                  <th className="small fw-semibold">Status</th>
-                  <th className="small fw-semibold">Borrows</th>
-                  <th className="small fw-semibold">Usage Score</th>
-                  <th className="small fw-semibold">Cluster</th>
-                  <th className="small fw-semibold"></th>
-                </tr>
-              </thead>
-              <tbody>
+          <div>
+            {viewMode === 'list' ? (
+              <div className="table-responsive">
+                <table className="table table-hover align-middle mb-0">
+                  <thead className="table-light">
+                    <tr>
+                      <th className="small fw-semibold">Accession No.</th>
+                      <th className="small fw-semibold">Title</th>
+                      <th className="small fw-semibold">Author</th>
+                      <th className="small fw-semibold">ISBN</th>
+                      <th className="small fw-semibold">Year</th>
+                      <th className="small fw-semibold">Publisher</th>
+                      <th className="small fw-semibold">Category</th>
+                      <th className="small fw-semibold">Department</th>
+                      <th className="small fw-semibold">Status</th>
+                      <th className="small fw-semibold">Borrows</th>
+                      <th className="small fw-semibold">Usage Score</th>
+                      <th className="small fw-semibold">Cluster</th>
+                      <th className="small fw-semibold"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((item) => (
+                      <tr key={item._id}>
+                        <td className="text-muted small fw-medium">{item.accessionNumber || '-'}</td>
+                        <td className="fw-medium">{item.title}</td>
+                        <td className="text-muted">{item.author}</td>
+                        <td className="text-muted small">{item.isbn}</td>
+                        <td className="text-muted">{item.publishYear}</td>
+                        <td className="text-muted">{item.publisher}</td>
+                        <td className="text-muted">{item.category}</td>
+                        <td className="text-muted">{item.department}</td>
+                        <td><span className={`badge ${statusBadge(item.status)}`}>{item.status}</span></td>
+                        <td>{item.usageMetrics.totalBorrows}</td>
+                        <td>{item.usageMetrics.usageScore.toFixed(2)}</td>
+                        <td>{item.cluster === -2 ? <span className="badge bg-secondary">New</span> : (item.cluster === -1 ? <span className="badge bg-warning text-dark">Not Yet Clustered</span> : <span className="badge bg-success">Clustered</span>)}</td>
+                        <td>
+                          <button className="btn btn-sm btn-outline-primary" onClick={() => openBorrowForm(item)}
+                            disabled={item.copies < 1} title={item.copies < 1 ? 'No copies available' : 'Borrow this item'}>
+                            <i className="bi bi-bookmark-plus"></i>
+                          </button>
+                          <button className="btn btn-sm btn-outline-secondary ms-1 me-1" onClick={() => openSimilar(item)}
+                            title="View similar books">
+                            <i className="bi bi-shuffle"></i>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="row g-3">
                 {items.map((item) => (
-                  <tr key={item._id}>
-                    <td className="text-muted small fw-medium">{item.accessionNumber || '-'}</td>
-                    <td className="fw-medium">{item.title}</td>
-                    <td className="text-muted">{item.author}</td>
-                    <td className="text-muted small">{item.isbn}</td>
-                    <td className="text-muted">{item.publishYear}</td>
-                    <td className="text-muted">{item.publisher}</td>
-                    <td className="text-muted">{item.category}</td>
-                    <td className="text-muted">{item.department}</td>
-                    <td><span className={`badge ${statusBadge(item.status)}`}>{item.status}</span></td>
-                    <td>{item.usageMetrics.totalBorrows}</td>
-                    <td>{item.usageMetrics.usageScore.toFixed(2)}</td>
-                    <td>{item.cluster === -2 ? <span className="badge bg-secondary">New</span> : (item.cluster === -1 ? <span className="badge bg-warning text-dark">Not Yet Clustered</span> : <span className="badge bg-success">Clustered</span>)}</td>
-                    <td>
-                      <button className="btn btn-sm btn-outline-primary" onClick={() => openBorrowForm(item)}
-                        disabled={item.copies < 1} title={item.copies < 1 ? 'No copies available' : 'Borrow this item'}>
-                        <i className="bi bi-bookmark-plus"></i>
-                      </button>
-                      <button className="btn btn-sm btn-outline-secondary ms-1 me-1" onClick={() => openSimilar(item)}
-                        title="View similar books">
-                        <i className="bi bi-shuffle"></i>
-                      </button>
-                    </td>
-                  </tr>
+                  <div key={item._id} className="col-12 col-sm-6 col-md-4 col-lg-3">
+                    <div className="card border-0 shadow-sm h-100">
+                      <div className="bg-light text-center p-4" style={{ minHeight: '180px', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                        {item.coverImage ? (
+                          <img src={item.coverImage} alt={item.title} className="img-fluid" style={{ maxHeight: '160px' }} />
+                        ) : (
+                          <i className="bi bi-book fs-1 text-muted"></i>
+                        )}
+                      </div>
+                      <div className="card-body p-3">
+                        <h6 className="fw-bold mb-1 text-truncate" title={item.title}>{item.title}</h6>
+                        <small className="text-muted d-block mb-1">{item.author}</small>
+                        <div className="d-flex flex-wrap gap-1 mb-2">
+                          <span className="badge bg-light text-dark">{item.department}</span>
+                          <span className="badge bg-light text-dark">{item.category}</span>
+                        </div>
+                        <div className="d-flex justify-content-between align-items-center">
+                          <small className="text-muted">{item.accessionNumber || '-'}</small>
+                          <span className={`badge ${statusBadge(item.status)}`}>{item.status}</span>
+                        </div>
+                        <div className="d-flex gap-1 mt-2">
+                          <button className="btn btn-sm btn-outline-primary flex-fill" onClick={() => openBorrowForm(item)}
+                            disabled={item.copies < 1} title={item.copies < 1 ? 'No copies available' : 'Borrow'}>
+                            <i className="bi bi-bookmark-plus"></i>
+                          </button>
+                          <button className="btn btn-sm btn-outline-secondary" onClick={() => openSimilar(item)} title="Similar">
+                            <i className="bi bi-shuffle"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            )}
           </div>
         )}
 
