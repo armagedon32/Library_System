@@ -805,6 +805,7 @@ def user_clustering():
 
         segments.append({
             'userId': uid, 'name': u.get('name', 'Unknown'), 'email': u.get('email', ''),
+            'studentId': u.get('studentId', ''),
             'department': u.get('department', ''), 'academicLevel': u.get('academicLevel', ''),
             'totalBorrows': total_borrows, 'totalRenewals': total_renewals,
             'avgDwellTime': round(avg_dwell, 1), 'overdue': overdue, 'damaged': damaged,
