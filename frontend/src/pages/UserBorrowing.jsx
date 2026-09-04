@@ -159,6 +159,7 @@ function UserBorrowing() {
             <table className="table table-hover align-middle mb-0">
               <thead className="table-light">
                 <tr>
+                  <th className="small fw-semibold">Accession No.</th>
                   <th className="small fw-semibold">Title</th>
                   <th className="small fw-semibold">Author</th>
                   <th className="small fw-semibold">Borrow Date</th>
@@ -170,6 +171,7 @@ function UserBorrowing() {
               <tbody>
                 {data?.records?.filter(r => !r.isReturned).map((record) => (
                   <tr key={record._id}>
+                    <td className="text-muted small fw-medium">{record.collectionItem?.accessionNumber || '-'}</td>
                     <td className="fw-medium">{record.collectionItem?.title || 'Unknown'}</td>
                     <td className="text-muted">{record.collectionItem?.author || 'Unknown'}</td>
                     <td className="text-muted">{new Date(record.borrowDate).toLocaleDateString()}</td>
@@ -209,6 +211,7 @@ function UserBorrowing() {
           <table className="table table-hover align-middle mb-0">
             <thead className="table-light">
               <tr>
+                <th className="small fw-semibold">Accession No.</th>
                 <th className="small fw-semibold">Title</th>
                 <th className="small fw-semibold">Author</th>
                 <th className="small fw-semibold">Category</th>
@@ -219,6 +222,7 @@ function UserBorrowing() {
             <tbody>
               {availableItems.filter(i => i.copies > 0 && (!bookSearch || i.title.toLowerCase().includes(bookSearch.toLowerCase()) || i.author.toLowerCase().includes(bookSearch.toLowerCase()))).slice(0, 20).map((item) => (
                 <tr key={item._id}>
+                  <td className="text-muted small fw-medium">{item.accessionNumber || '-'}</td>
                   <td className="fw-medium">{item.title}</td>
                   <td className="text-muted">{item.author}</td>
                   <td className="text-muted">{item.category}</td>

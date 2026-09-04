@@ -47,6 +47,7 @@ function BorrowModal({ show, item, onClose, onConfirm }) {
             <div className="modal-body">
               <div className="mb-3">
                 <small className="text-muted d-block mb-2">Borrowing: <strong>{item?.title}</strong></small>
+                {item?.accessionNumber && <small className="text-muted d-block">Accession No: <strong>{item.accessionNumber}</strong></small>}
               </div>
               <div className="row g-3">
                 <div className="col-12">

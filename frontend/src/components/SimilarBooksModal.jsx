@@ -51,6 +51,7 @@ function SimilarBooksModal({ show, item, onClose }) {
                     <div className="flex-grow-1 me-3">
                       <div className="fw-medium">{s.title}</div>
                       <div className="text-muted small">
+                        {s.accessionNumber && <><span className="badge bg-light text-dark me-1">{s.accessionNumber}</span></>}
                         {s.author} <span className="mx-1">·</span> {s.category} <span className="mx-1">·</span> {s.department}
                       </div>
                     </div>

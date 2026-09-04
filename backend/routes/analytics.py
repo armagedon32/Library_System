@@ -253,13 +253,13 @@ def download_items():
     items = list(mongo.db.collectionitems.find({}).sort('createdAt', -1))
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(['Title', 'Author', 'ISBN', 'Category', 'Department', 'Description', 'PublishYear',
+    writer.writerow(['AccessionNumber', 'Title', 'Author', 'ISBN', 'Category', 'Department', 'Description', 'PublishYear',
                      'Publisher', 'Location', 'Condition', 'Cost', 'Copies', 'Status',
                      'TotalBorrows', 'TotalRenewals', 'UsageScore', 'RetentionScore', 'Cluster'])
     for i in items:
         m = i.get('usageMetrics', {})
         writer.writerow([
-            i.get('title', ''), i.get('author', ''), i.get('isbn', ''), i.get('category', ''),
+            i.get('accessionNumber', ''), i.get('title', ''), i.get('author', ''), i.get('isbn', ''), i.get('category', ''),
             i.get('department', ''), i.get('description', ''), i.get('publishYear', ''),
             i.get('publisher', ''), i.get('location', ''), i.get('condition', ''),
             i.get('cost', 0), i.get('copies', 0), i.get('status', ''),
@@ -311,6 +311,7 @@ def upload_items():
 
         item = {
             'title': title, 'author': author, 'isbn': row.get('isbn', '').strip(),
+            'accessionNumber': row.get('accessionNumber', '').strip(),
             'category': category, 'department': department, 'description': description,
             'publishYear': pub_year, 'publisher': row.get('publisher', '').strip(),
             'location': row.get('location', '').strip(), 'condition': row.get('condition', 'New').strip(),
