@@ -168,6 +168,67 @@ function UserClustering() {
 
       <div className="card border-0 shadow-sm mb-4">
         <div className="card-header bg-white pt-4 px-4 border-bottom-0">
+          <h6 className="fw-bold mb-0"><i className="bi bi-diagram-3 me-2"></i>User Clustering → Analytics Flow</h6>
+          <small className="text-muted">How K-Means user segmentation drives library insights and services</small>
+        </div>
+        <div className="card-body">
+          <div className="row g-3 align-items-center">
+            <div className="col-md-2 text-center">
+              <div className="badge bg-primary p-3 fs-6"><i className="bi bi-people-fill fs-4"></i></div>
+              <small className="text-muted d-block mt-2 fw-medium">User Segmentation</small>
+              <small className="text-muted">K-Means by behavior patterns</small>
+            </div>
+            <div className="col-md-1 text-center">
+              <i className="bi bi-arrow-right fs-3 text-muted"></i>
+            </div>
+            <div className="col-md-3 text-center">
+              <div className="badge bg-info p-3 fs-6"><i className="bi bi-search fs-4"></i></div>
+              <small className="text-muted d-block mt-2 fw-medium">Behavior Patterns</small>
+              <small className="text-muted">Borrows, renewals, dwell, overdue</small>
+            </div>
+            <div className="col-md-1 text-center">
+              <i className="bi bi-arrow-right fs-3 text-muted"></i>
+            </div>
+            <div className="col-md-3 text-center">
+              <div className="badge bg-warning p-3 fs-6"><i className="bi bi-graph-up fs-4"></i></div>
+              <small className="text-muted d-block mt-2 fw-medium">Usage Analysis</small>
+              <small className="text-muted">Trends, diversity, overdue risk</small>
+            </div>
+            <div className="col-md-1 text-center">
+              <i className="bi bi-arrow-right fs-3 text-muted"></i>
+            </div>
+            <div className="col-md-3 text-center">
+              <div className="badge bg-success p-3 fs-6"><i className="bi bi-lightbulb fs-4"></i></div>
+              <small className="text-muted d-block mt-2 fw-medium">Library Insights</small>
+              <small className="text-muted">Collection gaps, service planning</small>
+            </div>
+          </div>
+          <hr className="my-3" />
+          <div className="row g-3">
+            <div className="col-md-4">
+              <div className="p-3 border rounded-3 bg-light">
+                <small className="text-muted d-block mb-1"><strong>High Demand</strong> → <span className="text-success">Priority Services</span></small>
+                <small className="text-muted">High borrows, frequent renewals, low overdue</small>
+              </div>
+            </div>
+            <div className="col-md-4">
+              <div className="p-3 border rounded-3 bg-light">
+                <small className="text-muted d-block mb-1"><strong>Active Borrower</strong> → <span className="text-primary">Targeted Services</span></small>
+                <small className="text-muted">Regular activity, diverse categories, moderate overdue</small>
+              </div>
+            </div>
+            <div className="col-md-4">
+              <div className="p-3 border rounded-3 bg-light">
+                <small className="text-muted d-block mb-1"><strong>Light User</strong> → <span className="text-warning">Outreach / Engagement</span></small>
+                <small className="text-muted">Low activity, limited diversity, potential disengagement</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="card border-0 shadow-sm mb-4">
+        <div className="card-header bg-white pt-4 px-4 border-bottom-0">
           <h6 className="fw-bold mb-0"><i className="bi bi-gear-wide-connected me-2"></i>Clustering Attributes</h6>
           <small className="text-muted">Attributes used for K-Means clustering of users/borrowers</small>
         </div>
