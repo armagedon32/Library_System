@@ -5,7 +5,7 @@ const conditions = ['New', 'Good', 'Fair', 'Poor'];
 
 function AddItemModal({ show, onClose, onSuccess }) {
   const [form, setForm] = useState({
-    title: '', author: '', isbn: '', description: '',
+    title: '', author: '', isbn: '', accessionNumber: '', description: '',
     publishYear: new Date().getFullYear(), publisher: '', location: '',
     condition: 'New', cost: 0, copies: 1
   });
@@ -22,7 +22,7 @@ function AddItemModal({ show, onClose, onSuccess }) {
       await createCollectionItem(form);
       onSuccess();
       onClose();
-      setForm({ title: '', author: '', isbn: '', description: '', publishYear: new Date().getFullYear(), publisher: '', location: '', condition: 'New', cost: 0, copies: 1 });
+      setForm({ title: '', author: '', isbn: '', accessionNumber: '', description: '', publishYear: new Date().getFullYear(), publisher: '', location: '', condition: 'New', cost: 0, copies: 1 });
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create item');
     } finally {
@@ -55,6 +55,10 @@ function AddItemModal({ show, onClose, onSuccess }) {
                 <div className="col-md-6">
                   <label className="form-label small fw-medium">ISBN *</label>
                   <input name="isbn" className="form-control" value={form.isbn} onChange={handleChange} required />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label small fw-medium">Accession Number</label>
+                  <input name="accessionNumber" className="form-control" placeholder="e.g., ACC-2024-001" value={form.accessionNumber} onChange={handleChange} />
                 </div>
                 <div className="col-12">
                   <label className="form-label small fw-medium">Description</label>

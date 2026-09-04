@@ -172,6 +172,18 @@ function CollectionItems() {
                 <option value="Recommend Keep">Keep</option>
               </select>
             </div>
+            <div className="col">
+              <select className="form-select form-select-sm" value={filters.publishYear}
+                onChange={(e) => setFilters({ ...filters, publishYear: e.target.value })}>
+                <option value="">All Years</option>
+                <option value="2026">2026</option>
+                <option value="2025">2025</option>
+                <option value="2024">2024</option>
+                <option value="2023">2023</option>
+                <option value="2022">2022</option>
+                <option value="2021">2021</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>
@@ -191,6 +203,7 @@ function CollectionItems() {
             <table className="table table-hover align-middle mb-0">
               <thead className="table-light">
                 <tr>
+                  <th className="small fw-semibold">Accession No.</th>
                   <th className="small fw-semibold">Title</th>
                   <th className="small fw-semibold">Author</th>
                   <th className="small fw-semibold">ISBN</th>
@@ -208,6 +221,7 @@ function CollectionItems() {
               <tbody>
                 {items.map((item) => (
                   <tr key={item._id}>
+                    <td className="text-muted small fw-medium">{item.accessionNumber || '-'}</td>
                     <td className="fw-medium">{item.title}</td>
                     <td className="text-muted">{item.author}</td>
                     <td className="text-muted small">{item.isbn}</td>

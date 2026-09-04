@@ -199,6 +199,11 @@ function Settings() {
                   onChange={(e) => setProfile({ ...profile, name: e.target.value })} required />
               </div>
               <div className="col-md-6">
+                <label className="form-label small fw-medium">Student ID</label>
+                <input className="form-control" placeholder="e.g., 2024-0001" value={profile.studentId || ''}
+                  onChange={(e) => setProfile({ ...profile, studentId: e.target.value })} />
+              </div>
+              <div className="col-md-6">
                 <label className="form-label small fw-medium">Department</label>
                 <select className="form-select" value={profile.department}
                   onChange={(e) => setProfile({ ...profile, department: e.target.value })}>
@@ -272,6 +277,7 @@ function Settings() {
             <div className="row g-3">
               {[
                 { label: 'Email Address', value: user?.email },
+                { label: 'Student ID', value: user?.studentId || '—' },
                 { label: 'Role', value: user?.role },
                 { label: 'Department', value: user?.department || '—' },
                 { label: 'Academic Level', value: user?.academicLevel || '—' },
@@ -285,6 +291,32 @@ function Settings() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === 'information' && (
+        <div className="card border-0 shadow-sm mt-4">
+          <div className="card-header bg-white pt-4 px-4 border-bottom-0">
+            <h6 className="fw-bold mb-0"><i className="bi bi-eye me-2"></i>Display Preferences</h6>
+          </div>
+          <div className="card-body">
+            <div className="row g-3">
+              <div className="col-md-6">
+                <div className="form-check form-switch">
+                  <input className="form-check-input" type="checkbox" id="showBookCovers"
+                    checked={localStorage.getItem('showBookCovers') !== 'false'}
+                    onChange={(e) => {
+                      localStorage.setItem('showBookCovers', e.target.checked);
+                      window.dispatchEvent(new Event('storage'));
+                    }} />
+                  <label className="form-check-label" htmlFor="showBookCovers">
+                    <strong>Show Book Cover Images</strong>
+                    <br /><small className="text-muted">Toggle to show or hide book cover images in the collection list</small>
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
         </div>

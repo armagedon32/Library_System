@@ -207,6 +207,7 @@ def create_item():
         'publisher': pub, 'location': data.get('location', ''),
         'condition': data.get('condition', 'New'), 'cost': float(data.get('cost', 0)),
         'copies': int(data.get('copies', 1)), 'status': 'Active', 'cluster': -1,
+        'accessionNumber': data.get('accessionNumber', ''),
         'usageMetrics': {'totalBorrows': 0, 'totalRenewals': 0, 'averageDwellTime': 0, 'usageScore': 0, 'retentionScore': 0},
         'createdAt': datetime.utcnow()
     }
@@ -234,6 +235,8 @@ def get_items():
     if cat: query['category'] = {'$regex': cat, '$options': 'i'}
     cluster = request.args.get('cluster')
     if cluster: query['cluster'] = int(cluster)
+    publish_year = request.args.get('publishYear')
+    if publish_year: query['publishYear'] = int(publish_year)
 
     page = int(request.args.get('page', 1))
     limit = int(request.args.get('limit', 20))

@@ -24,6 +24,7 @@ def user_to_dict(user, include_token=False):
         '_id': str(user['_id']),
         'name': user.get('name', ''),
         'email': user.get('email', ''),
+        'studentId': user.get('studentId', ''),
         'role': user.get('role', 'user'),
         'department': user.get('department', ''),
         'academicLevel': user.get('academicLevel', ''),
@@ -40,6 +41,7 @@ def register():
     email = data.get('email', '').strip()
     password = data.get('password', '')
     department = data.get('department', '')
+    student_id = data.get('studentId', '').strip()
 
     if not name or not email or not password:
         return jsonify({'message': 'Please provide all required fields'}), 400
@@ -47,11 +49,15 @@ def register():
     if mongo.db.users.find_one({'email': email}):
         return jsonify({'message': 'User already exists'}), 400
 
+    if student_id and mongo.db.users.find_one({'studentId': student_id}):
+        return jsonify({'message': 'Student ID already exists'}), 400
+
     hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(12))
     result = mongo.db.users.insert_one({
         'name': name,
         'email': email,
         'password': hashed,
+        'studentId': student_id,
         'role': 'user',
         'department': department,
         'createdAt': datetime.utcnow()
@@ -129,6 +135,7 @@ def update_profile():
     user = g.current_user
     data = request.get_json() or {}
     name = (data.get('name') or '').strip()
+    student_id = (data.get('studentId') or '').strip()
     department = (data.get('department') or '').strip()
     academic_level = (data.get('academicLevel') or '').strip()
     contact = (data.get('contactNumber') or '').strip()
@@ -136,7 +143,11 @@ def update_profile():
     if not name:
         return jsonify({'message': 'Name is required'}), 400
 
-    update = {'name': name, 'department': department,
+    if student_id and student_id != user.get('studentId', ''):
+        if mongo.db.users.find_one({'studentId': student_id, '_id': {'$ne': ObjectId(user['_id'])}}):
+            return jsonify({'message': 'Student ID already exists'}), 400
+
+    update = {'name': name, 'studentId': student_id, 'department': department,
               'academicLevel': academic_level, 'contactNumber': contact}
     mongo.db.users.update_one({'_id': ObjectId(user['_id'])}, {'$set': update})
     log_activity(user['_id'], 'Update Profile', f'Profile updated for "{name}"')

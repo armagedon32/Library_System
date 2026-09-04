@@ -7,7 +7,7 @@ import Logo from '../components/Logo';
 function Register() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [formData, setFormData] = useState({
-    name: '', email: '', password: '', confirmPassword: '', department: '', adminKey: ''
+    name: '', email: '', password: '', confirmPassword: '', department: '', studentId: '', adminKey: ''
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -109,6 +109,18 @@ function Register() {
                 <input type="email" name="email" className="form-control bg-light border-start-0 ps-0" placeholder="you@university.edu" value={formData.email} onChange={handleChange} required />
               </div>
             </div>
+
+            {!isAdmin && (
+              <div className="mb-3">
+                <label className="form-label small fw-medium text-secondary">Student ID</label>
+                <div className="input-group">
+                  <span className="input-group-text bg-light border-end-0">
+                    <i className="bi bi-credit-card text-muted"></i>
+                  </span>
+                  <input type="text" name="studentId" className="form-control bg-light border-start-0 ps-0" placeholder="e.g., 2024-0001" value={formData.studentId} onChange={handleChange} />
+                </div>
+              </div>
+            )}
 
             <div className="mb-3">
               <label className="form-label small fw-medium text-secondary">Department</label>
