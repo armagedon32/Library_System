@@ -100,6 +100,67 @@ function CollectionDecisions() {
         </p>
       </div>
 
+      <div className="card border-0 shadow-sm mb-4">
+        <div className="card-header bg-white pt-4 px-4 border-bottom-0">
+          <h6 className="fw-bold mb-0"><i className="bi bi-diagram-3 me-2"></i>Clustering → Decisions Flow</h6>
+          <small className="text-muted">How K-Means clustering informs collection decisions</small>
+        </div>
+        <div className="card-body">
+          <div className="row g-3 align-items-center">
+            <div className="col-md-2 text-center">
+              <div className="badge bg-primary p-3 fs-6"><i className="bi bi-diagram-3 fs-4"></i></div>
+              <small className="text-muted d-block mt-2 fw-medium">Book Clustering</small>
+              <small className="text-muted">K-Means by usage + content</small>
+            </div>
+            <div className="col-md-1 text-center">
+              <i className="bi bi-arrow-right fs-3 text-muted"></i>
+            </div>
+            <div className="col-md-3 text-center">
+              <div className="badge bg-info p-3 fs-6"><i className="bi bi-graph-up fs-4"></i></div>
+              <small className="text-muted d-block mt-2 fw-medium">Usage Analytics</small>
+              <small className="text-muted">Borrows, renewals, dwell, score</small>
+            </div>
+            <div className="col-md-1 text-center">
+              <i className="bi bi-arrow-right fs-3 text-muted"></i>
+            </div>
+            <div className="col-md-3 text-center">
+              <div className="badge bg-warning p-3 fs-6"><i className="bi bi-bar-chart fs-4"></i></div>
+              <small className="text-muted d-block mt-2 fw-medium">Demand Analysis</small>
+              <small className="text-muted">Forecast, coverage, gaps</small>
+            </div>
+            <div className="col-md-1 text-center">
+              <i className="bi bi-arrow-right fs-3 text-muted"></i>
+            </div>
+            <div className="col-md-3 text-center">
+              <div className="badge bg-success p-3 fs-6"><i className="bi bi-clipboard-check fs-4"></i></div>
+              <small className="text-muted d-block mt-2 fw-medium">Collection Decision</small>
+              <small className="text-muted">Retain / Acquire / Weed / Review</small>
+            </div>
+          </div>
+          <hr className="my-3" />
+          <div className="row g-3">
+            <div className="col-md-4">
+              <div className="p-3 border rounded-3 bg-light">
+                <small className="text-muted d-block mb-1"><strong>High Usage Cluster</strong> → <span className="text-success">Retain / Add Copies</span></small>
+                <small className="text-muted">High borrows + high usage score + high retention</small>
+              </div>
+            </div>
+            <div className="col-md-4">
+              <div className="p-3 border rounded-3 bg-light">
+                <small className="text-muted"><strong>Low Usage Cluster</strong> → <span className="text-warning">Review / Weed</span></small>
+                <small className="text-muted">Low borrows + low usage score + aged items</small>
+              </div>
+            </div>
+            <div className="col-md-4">
+              <div className="p-3 border rounded-3 bg-light">
+                <small className="text-muted"><strong>New Items (Cluster -2)</strong> → <span className="text-info">Monitor</span></small>
+                <small className="text-muted">Newly acquired items with no usage history yet</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="row g-3 mb-4">
         {statCards.map((s) => (
           <div className="col-6 col-md-4 col-xl" key={s.label}>
