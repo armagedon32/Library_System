@@ -878,6 +878,153 @@ def user_clustering():
     return jsonify({'clusters': segments, 'summary': summary, 'totalUsers': len(segments), 'k': len([c for c in [0, 1, 2] if clusters_map]), 'metrics': metrics})
 
 
+@analytics_bp.route('/user-clustering/run', methods=['POST'])
+@admin_required
+def run_user_clustering():
+    """Run K-Means clustering on users and save cluster assignments."""
+    from activity import log_activity
+    
+    users = list(mongo.db.users.find({'role': {'$ne': 'admin'}}))
+    if not users:
+        return jsonify({'message': 'No users found'}), 400
+    
+    records_by_user = {}
+    for u in users:
+        records_by_user[str(u['_id'])] = []
+    
+    all_records = list(mongo.db.usagerecords.find({}))
+    for r in all_records:
+        uid = str(r.get('user')) if isinstance(r.get('user'), ObjectId) else str(r.get('user'))
+        if uid in records_by_user:
+            records_by_user[uid].append(r)
+    
+    item_info = {}
+    ids = list({r['collectionItem'] for recs in records_by_user.values() for r in recs
+                if isinstance(r.get('collectionItem'), ObjectId)})
+    for it in mongo.db.collectionitems.find({'_id': {'$in': ids}}, {'category': 1, 'department': 1}):
+        item_info[str(it['_id'])] = it
+    
+    points = []
+    segments = []
+    
+    for u in users:
+        uid = str(u['_id'])
+        recs = records_by_user.get(uid, [])
+        n = len(recs)
+        total_borrows = n
+        total_renewals = sum(r.get('renewalCount', 0) for r in recs)
+        dwells = [r.get('dwellTime', 0) for r in recs if r.get('isReturned')]
+        avg_dwell = sum(dwells) / len(dwells) if dwells else 0
+        overdue = sum(1 for r in recs if r.get('isOverdue'))
+        damaged = sum(1 for r in recs if r.get('isDamaged'))
+        missing = sum(r.get('missingCount', 0) for r in recs)
+        categories = set()
+        departments = set()
+        for r in recs:
+            cid = r.get('collectionItem')
+            if isinstance(cid, ObjectId) and str(cid) in item_info:
+                info = item_info[str(cid)]
+                if info.get('category'): categories.add(info['category'])
+                if info.get('department'): departments.add(info['department'])
+        
+        features = [total_borrows, total_renewals, avg_dwell, overdue, damaged, missing,
+                    len(categories), len(departments)]
+        points.append({'id': uid, 'features': features})
+        
+        if total_borrows >= 25:
+            seg = 'Frequent Borrower'
+        elif total_borrows >= 12:
+            seg = 'Active'
+        elif total_borrows >= 5:
+            seg = 'Causal / Light'
+        else:
+            seg = 'Light User'
+        
+        if overdue >= 3:
+            seg = 'High Dwell / Overdue'
+        if avg_dwell > 20:
+            seg = 'Long Dwell / Retention'
+        
+        segments.append({
+            'userId': uid, 'name': u.get('name', 'Unknown'), 'email': u.get('email', ''),
+            'studentId': u.get('studentId', ''),
+            'department': u.get('department', ''), 'academicLevel': u.get('academicLevel', ''),
+            'totalBorrows': total_borrows, 'totalRenewals': total_renewals,
+            'avgDwellTime': round(avg_dwell, 1), 'overdue': overdue, 'damaged': damaged,
+            'missing': missing, 'categoriesBorrowed': len(categories),
+            'departmentsBorrowed': len(departments), 'segment': seg
+        })
+    
+    active_points = [p for p in points if p['features'][0] > 0]
+    clusters_map = {}
+    metrics = {'silhouette': None, 'daviesBouldin': None, 'k': 0}
+    
+    if len(active_points) >= 3:
+        k = 2 if len(active_points) < 6 else 3
+        res = kmeans_feature_full(active_points, k)
+        if res:
+            clusters_map = {c['id']: c['cluster'] for c in res['assignments']}
+            unique = list(set(res['labels']))
+            metrics['k'] = len(unique)
+            sil = silhouette_score(res['normalized'], res['labels'])
+            dbi = davies_bouldin_index(res['normalized'], res['labels'])
+            metrics['silhouette'] = round(sil, 4) if sil is not None else None
+            metrics['daviesBouldin'] = round(dbi, 4) if dbi is not None else None
+    
+    label_by_cluster = {}
+    cl_avg = {}
+    for cl in [0, 1, 2]:
+        members = [s for s in segments if s['cluster'] == cl]
+        if members:
+            cl_avg[cl] = sum(m['totalBorrows'] for m in members) / len(members)
+    if cl_avg:
+        ranked = sorted(cl_avg.items(), key=lambda x: -x[1])
+        labels = ['High Demand', 'Active Borrower', 'Light User']
+        for i, (cl, _) in enumerate(ranked):
+            label_by_cluster[cl] = labels[i] if i < 3 else f'Cluster {cl}'
+        for seg in segments:
+            if seg['cluster'] in label_by_cluster:
+                seg['segment'] = label_by_cluster[seg['cluster']]
+    else:
+        for seg in segments:
+            if seg['cluster'] >= 0:
+                seg['segment'] = f'Cluster {seg["cluster"]}'
+    
+    # Save cluster assignments to database
+    for seg in segments:
+        cl = clusters_map.get(seg['userId'], -1)
+        if seg['totalBorrows'] == 0:
+            seg['segment'] = 'No Activity'
+        else:
+            seg['segment'] = label_by_cluster.get(cl, f'Cluster {cl}' if cl >= 0 else 'Not Clustered')
+        seg['cluster'] = cl
+        mongo.db.users.update_one(
+            {'_id': ObjectId(seg['userId'])},
+            {'$set': {'cluster': cl, 'segment': seg['segment']}}
+        )
+    
+    # Recalculate summary with final labels
+    summary = []
+    for cl in [-1, 0, 1, 2]:
+        members = [s for s in segments if s['cluster'] == cl]
+        if not members:
+            continue
+        label = 'No Activity' if cl == -1 else label_by_cluster.get(cl, f'Cluster {cl}')
+        summary.append({
+            'cluster': cl, 'label': label, 'count': len(members),
+            'avgBorrows': round(sum(m['totalBorrows'] for m in members) / len(members), 1),
+            'avgRenewals': round(sum(m['totalRenewals'] for m in members) / len(members), 1),
+            'avgDwell': round(sum(m['avgDwellTime'] for m in members) / len(members), 1),
+            'avgOverdue': round(sum(m['overdue'] for m in members) / len(members), 1),
+            'overdueTotal': sum(m['overdue'] for m in members),
+            'segments': segment_members(segments, cl)
+        })
+    summary.sort(key=lambda s: s['cluster'])
+    
+    log_activity(g.current_user.get('_id'), 'Run User Clustering', f'K-Means completed with k={metrics["k"]}')
+    return jsonify({'message': 'User clustering completed', 'k': metrics['k'], 'clusterStats': summary, 'metrics': metrics})
+
+
 @analytics_bp.route('/recommend/similar/<item_id>', methods=['GET'])
 @token_required
 def similar_items(item_id):

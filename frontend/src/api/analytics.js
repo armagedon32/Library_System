@@ -30,6 +30,11 @@ export const runClustering = async () => {
   return response.data;
 };
 
+export const runUserClustering = async () => {
+  const response = await api.post('/analytics/user-clustering/run');
+  return response.data;
+};
+
 export const getClusteringResults = async () => {
   const response = await api.get('/analytics/clustering/results');
   return response.data;

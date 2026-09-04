@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getUserClustering, getRecommendationsForMe } from '../api/analytics';
+import { getUserClustering, getRecommendationsForMe, runUserClustering } from '../api/analytics';
 import { useToast } from '../components/Toast';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 
@@ -9,6 +9,7 @@ function UserClustering() {
   const { addToast } = useToast();
   const [data, setData] = useState({ clusters: [], summary: [], totalUsers: 0, metrics: {} });
   const [loading, setLoading] = useState(true);
+  const [running, setRunning] = useState(false);
   const [recUser, setRecUser] = useState(null);
   const [recs, setRecs] = useState([]);
   const [recLoading, setRecLoading] = useState(false);
@@ -19,6 +20,31 @@ function UserClustering() {
       .catch(() => addToast('Failed to load user clusters', 'danger'))
       .finally(() => setLoading(false));
   }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const fresh = await getUserClustering();
+      setData(fresh);
+    } catch (e) {
+      addToast('Failed to load user clusters', 'danger');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRunClustering = async () => {
+    setRunning(true);
+    try {
+      await runUserClustering();
+      addToast('User clustering completed successfully!', 'success');
+      await loadData();
+    } catch (error) {
+      addToast(error.response?.data?.message || 'Failed to run clustering', 'danger');
+    } finally {
+      setRunning(false);
+    }
+  };
 
   const viewRecommendations = async (u) => {
     setRecUser(u);
@@ -44,13 +70,76 @@ function UserClustering() {
 
   const pieData = data.summary.map((s) => ({ name: s.label, value: s.count }));
 
+  const renderModal = () => {
+    if (!recUser) return null;
+    return (
+      <div className="modal d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div className="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+          <div className="modal-content border-0 shadow">
+            <div className="modal-header border-bottom-0 pb-0">
+              <h5 className="modal-title fw-bold"><i className="bi bi-stars me-2"></i>Recommended for {recUser.name}</h5>
+              <button type="button" className="btn-close" onClick={() => setRecUser(null)}></button>
+            </div>
+            <div className="modal-body">
+              {recLoading ? (
+                <div className="text-center p-5">
+                  <div className="spinner-border text-primary" role="status"></div>
+                </div>
+              ) : recs.length === 0 ? (
+                <div className="text-center p-5 text-muted">
+                  <i className="bi bi-stars fs-1 d-block mb-2"></i>
+                  <span>No recommendations available for this user.</span>
+                </div>
+              ) : (
+                <div className="table-responsive">
+                  <table className="table table-hover align-middle mb-0">
+                    <thead className="table-light">
+                      <tr>
+                        <th className="small">Title</th>
+                        <th className="small">Author</th>
+                        <th className="small">Category</th>
+                        <th className="small">Why</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recs.map((r) => (
+                        <tr key={r._id}>
+                          <td className="fw-medium">{r.title}</td>
+                          <td className="text-muted">{r.author}</td>
+                          <td><span className="badge bg-primary bg-opacity-10 text-primary">{r.category}</span></td>
+                          <td className="text-muted small">{r.reason}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer border-top-0">
+              <button type="button" className="btn btn-light" onClick={() => setRecUser(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div>
-      <div className="mb-4">
-        <h4 className="fw-bold mb-1">User Segmentation — Unsupervised Learning</h4>
-        <p className="text-muted small mb-0">
-          K-Means clustering of users based on borrowing behavior and usage patterns
-        </p>
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h4 className="fw-bold mb-1">User Segmentation — Unsupervised Learning</h4>
+          <p className="text-muted small mb-0">
+            K-Means clustering of users based on borrowing behavior and usage patterns
+          </p>
+        </div>
+        <button className="btn btn-dark btn-sm" onClick={handleRunClustering} disabled={running}>
+          {running ? (
+            <><span className="spinner-border spinner-border-sm me-1"></span>Running...</>
+          ) : (
+            <><i className="bi bi-play-fill me-1"></i>Run Clustering</>
+          )}
+        </button>
       </div>
 
       <div className="row g-4 mb-4">
@@ -139,7 +228,7 @@ function UserClustering() {
                 </div>
                 <div className="col-6">
                   <div className="border rounded-3 p-3 text-center h-100">
-                    <div className="text-muted small fw-medium mb-1"><i className="bi bi-diagram-3 me-1"></i>Davies–Bouldin Index</div>
+                    <div className="text-muted small fw-medium mb-1"><i className="bi bi-bounding-box me-1"></i>Davies–Bouldin Index</div>
                     <div className={`display-6 fw-bold ${data.metrics.daviesBouldin != null && data.metrics.daviesBouldin < 1 ? 'text-success' : 'text-warning'}`}>
                       {data.metrics.daviesBouldin != null ? data.metrics.daviesBouldin.toFixed(4) : '—'}
                     </div>
@@ -196,109 +285,50 @@ function UserClustering() {
         </div>
       </div>
 
-      {data.summary.map((s, idx) => (
-        <div key={s.cluster} className="card border-0 shadow-sm mb-4">
-          <div className="card-header bg-white pt-3 px-4 border-bottom-0 d-flex align-items-center">
-            <span className="badge me-2" style={{ backgroundColor: COLORS[idx % COLORS.length] }}>{s.label}</span>
-            <span className="badge bg-secondary ms-2">{s.count} users</span>
-            <div className="ms-auto d-flex gap-3 small text-muted">
-              <span><i className="bi bi-arrow-repeat me-1"></i>{s.avgBorrows} avg borrows</span>
-              <span><i className="bi bi-clock me-1"></i>{s.avgDwell} avg dwell (days)</span>
-              <span><i className="bi bi-exclamation-triangle me-1"></i>{s.overdueTotal} overdue</span>
+      <div className="row g-4 mb-4">
+        <div className="col-12">
+          <div className="card border-0 shadow-sm">
+            <div className="card-header bg-white pt-4 px-4 border-bottom-0">
+              <h6 className="fw-bold mb-0"><i className="bi bi-people me-2"></i>Borrower Segmentation</h6>
+              <small className="text-muted">Individual borrower cluster assignments</small>
             </div>
-          </div>
-          <div className="table-responsive">
-            <table className="table table-hover align-middle mb-0">
-<thead className="table-light">
+            <div className="table-responsive">
+              <table className="table table-hover align-middle mb-0">
+                <thead className="table-light">
                   <tr>
-                    <th className="small">Student ID</th>
-                    <th className="small">User</th>
-                    <th className="small">Dept</th>
-                    <th className="small">Borrows</th>
-                    <th className="small">Renewals</th>
-                    <th className="small">Avg Dwell</th>
-                    <th className="small">Overdue</th>
-                    <th className="small">Categories</th>
-                    <th className="small">Departments</th>
-                    <th className="small"></th>
+                    <th className="small fw-semibold">Borrower</th>
+                    <th className="small fw-semibold">Student ID</th>
+                    <th className="small fw-semibold">Borrowings</th>
+                    <th className="small fw-semibold">Renewals</th>
+                    <th className="small fw-semibold">Usage</th>
+                    <th className="small fw-semibold">Cluster</th>
                   </tr>
                 </thead>
-              <tbody>
-{data.clusters.filter((u) => u.cluster === s.cluster).map((u) => (
+                <tbody>
+                  {data.clusters.map((u) => (
                     <tr key={u.userId}>
-                      <td className="text-muted small fw-medium">{u.studentId || '—'}</td>
                       <td className="fw-medium">{u.name}</td>
-                      <td className="text-muted">{u.department}</td>
-                    <td>{u.totalBorrows}</td>
-                    <td>{u.totalRenewals}</td>
-                    <td>{u.avgDwellTime}</td>
-                    <td><span className={u.overdue > 0 ? 'text-danger fw-medium' : ''}>{u.overdue}</span></td>
-                    <td>{u.categoriesBorrowed}</td>
-                    <td>{u.departmentsBorrowed}</td>
-                    <td>
-                      <button className="btn btn-sm btn-outline-primary" onClick={() => viewRecommendations(u)}
-                        title="View recommended books for this user">
-                        <i className="bi bi-stars me-1"></i>Recommend
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ))}
-
-      {recUser && (
-        <div className="modal d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <div className="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
-            <div className="modal-content border-0 shadow">
-              <div className="modal-header border-bottom-0 pb-0">
-                <h5 className="modal-title fw-bold"><i className="bi bi-stars me-2"></i>Recommended for {recUser.name}</h5>
-                <button type="button" className="btn-close" onClick={() => setRecUser(null)}></button>
-              </div>
-              <div className="modal-body">
-                {recLoading ? (
-                  <div className="text-center p-5">
-                    <div className="spinner-border text-primary" role="status"></div>
-                  </div>
-                ) : recs.length === 0 ? (
-                  <div className="text-center p-5 text-muted">
-                    <i className="bi bi-stars fs-1 d-block mb-2"></i>
-                    <span>No recommendations available for this user.</span>
-                  </div>
-                ) : (
-                  <div className="table-responsive">
-                    <table className="table table-hover align-middle mb-0">
-                      <thead className="table-light">
-                        <tr>
-                          <th className="small">Title</th>
-                          <th className="small">Author</th>
-                          <th className="small">Category</th>
-                          <th className="small">Why</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {recs.map((r) => (
-                          <tr key={r._id}>
-                            <td className="fw-medium">{r.title}</td>
-                            <td className="text-muted">{r.author}</td>
-                            <td><span className="badge bg-primary bg-opacity-10 text-primary">{r.category}</span></td>
-                            <td className="text-muted small">{r.reason}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-              <div className="modal-footer border-top-0">
-                <button type="button" className="btn btn-light" onClick={() => setRecUser(null)}>Close</button>
-              </div>
+                      <td className="text-muted small">{u.studentId || '—'}</td>
+                      <td>{u.totalBorrows}</td>
+                      <td>{u.totalRenewals}</td>
+                      <td>{u.avgDwellTime}</td>
+                      <td>
+                        {u.cluster === -1 ? (
+                          <span className="badge bg-warning text-dark">Not Clustered</span>
+                        ) : (
+                          <span className="badge bg-success">{u.segment}</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
-      )}
+      </div>
+
+      {renderModal()}
     </div>
   );
 }
