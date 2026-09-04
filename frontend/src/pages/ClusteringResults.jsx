@@ -88,13 +88,18 @@ function ClusteringResults() {
           <h4 className="fw-bold mb-1">Book Clustering Dashboard</h4>
           <p className="text-muted small mb-0">Unsupervised Learning — K-Means clustering of collection items by usage patterns</p>
         </div>
-        <button className="btn btn-dark btn-sm" onClick={handleRunClustering} disabled={running}>
-          {running ? (
-            <><span className="spinner-border spinner-border-sm me-1"></span>Running...</>
-          ) : (
-            <><i className="bi bi-play-fill me-1"></i>Run Clustering</>
-          )}
-        </button>
+        <div className="d-flex align-items-center gap-3">
+          <span className={`badge ${running ? 'bg-info' : kValue ? 'bg-success' : 'bg-warning text-dark'} fs-6`}>
+            {running ? <><span className="spinner-border spinner-border-sm me-1"></span>Running...</> : kValue ? <><i className="bi bi-check-circle me-1"></i>Completed</> : <><i className="bi bi-circle me-1"></i>Not Yet Run</>}
+          </span>
+          <button className="btn btn-dark btn-sm" onClick={handleRunClustering} disabled={running}>
+            {running ? (
+              <><span className="spinner-border spinner-border-sm me-1"></span>Running...</>
+            ) : (
+              <><i className="bi bi-play-fill me-1"></i>Run Clustering</>
+            )}
+          </button>
+        </div>
       </div>
 
       {kValue && (
