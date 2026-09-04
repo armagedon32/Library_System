@@ -15,11 +15,14 @@ function Transactions() {
   const [data, setData] = useState({ transactions: [], counts: {} });
   const [filter, setFilter] = useState('');
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   useEffect(() => { load(); }, [filter]);
 
   const load = async () => {
     setLoading(true);
+    setCurrentPage(1);
     try {
       const res = await getTransactions(filter);
       setData(res);
@@ -29,6 +32,10 @@ function Transactions() {
       setLoading(false);
     }
   };
+
+  const filteredTransactions = data.transactions || [];
+  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+  const paginatedTransactions = filteredTransactions.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   if (loading) {
     return (
@@ -80,9 +87,9 @@ function Transactions() {
               </tr>
             </thead>
             <tbody>
-              {data.transactions.length === 0 ? (
+              {paginatedTransactions.length === 0 ? (
                 <tr><td colSpan="8" className="text-center text-muted py-4">No transactions found.</td></tr>
-              ) : data.transactions.map((t) => (
+              ) : paginatedTransactions.map((t) => (
                 <tr key={t._id}>
                   <td className="fw-medium">{t.borrowerName}
                     {t.department && <div className="small text-muted">{t.department}</div>}
@@ -99,6 +106,43 @@ function Transactions() {
             </tbody>
           </table>
         </div>
+
+        {totalPages > 1 && (
+          <div className="card-footer bg-white border-top-0">
+            <div className="d-flex justify-content-between align-items-center">
+              <small className="text-muted">
+                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredTransactions.length)} of {filteredTransactions.length} transactions
+              </small>
+              <nav>
+                <ul className="pagination pagination-sm mb-0">
+                  <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                    <button className="page-link" onClick={() => setCurrentPage(currentPage - 1)}>Previous</button>
+                  </li>
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    return (
+                      <li key={pageNum} className={`page-item ${currentPage === pageNum ? 'active' : ''}`}>
+                        <button className="page-link" onClick={() => setCurrentPage(pageNum)}>{pageNum}</button>
+                      </li>
+                    );
+                  })}
+                  <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                    <button className="page-link" onClick={() => setCurrentPage(currentPage + 1)}>Next</button>
+                  </li>
+                </ul>
+              </nav>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

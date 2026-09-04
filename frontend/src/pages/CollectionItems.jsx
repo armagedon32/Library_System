@@ -9,9 +9,11 @@ function CollectionItems() {
   const { addToast } = useToast();
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [filters, setFilters] = useState({ department: '', category: '', status: '' });
+  const [filters, setFilters] = useState({ department: '', category: '', status: '', publishYear: '' });
   const [showModal, setShowModal] = useState(false);
   const [showBorrowModal, setShowBorrowModal] = useState(false);
   const [borrowItemData, setBorrowItemData] = useState(null);
@@ -25,16 +27,17 @@ function CollectionItems() {
       loadItems();
     }, 300);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [search, filters.department, filters.category, filters.status]);
+  }, [search, filters.department, filters.category, filters.status, filters.publishYear, currentPage]);
 
   const loadItems = async () => {
     setLoading(true);
     try {
-      const params = { ...filters, search };
+      const params = { ...filters, search, page: currentPage, limit: 10 };
       Object.keys(params).forEach(k => { if (!params[k]) delete params[k]; });
       const data = await getCollectionItems(params);
       setItems(data.items);
       setTotal(data.total);
+      setTotalPages(data.totalPages);
     } catch (error) {
       console.error('Failed to load items:', error);
     } finally {
@@ -247,6 +250,43 @@ function CollectionItems() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {totalPages > 1 && (
+          <div className="card-footer bg-white border-top-0">
+            <div className="d-flex justify-content-between align-items-center">
+              <small className="text-muted">
+                Showing {((currentPage - 1) * 10) + 1} to {Math.min(currentPage * 10, total)} of {total} items
+              </small>
+              <nav>
+                <ul className="pagination pagination-sm mb-0">
+                  <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                    <button className="page-link" onClick={() => setCurrentPage(currentPage - 1)}>Previous</button>
+                  </li>
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    return (
+                      <li key={pageNum} className={`page-item ${currentPage === pageNum ? 'active' : ''}`}>
+                        <button className="page-link" onClick={() => setCurrentPage(pageNum)}>{pageNum}</button>
+                      </li>
+                    );
+                  })}
+                  <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                    <button className="page-link" onClick={() => setCurrentPage(currentPage + 1)}>Next</button>
+                  </li>
+                </ul>
+              </nav>
+            </div>
           </div>
         )}
       </div>
