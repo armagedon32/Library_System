@@ -251,19 +251,29 @@ function ClusteringResults() {
                   <th className="small fw-semibold">Avg Retention</th>
                   <th className="small fw-semibold">Avg Borrows</th>
                   <th className="small fw-semibold">Avg Dwell Time</th>
+                  <th className="small fw-semibold">Interpretation</th>
                 </tr>
               </thead>
               <tbody>
-                {summary.map((c) => (
-                  <tr key={c._id}>
-                    <td><span className="badge bg-success">Clustered</span></td>
-                    <td className="fw-medium">{c.count}</td>
-                    <td>{Number(c.avgUsageScore || 0).toFixed(2)}</td>
-                    <td>{Number(c.avgRetentionScore || 0).toFixed(2)}</td>
-                    <td>{Number(c.avgBorrows || 0).toFixed(2)}</td>
-                    <td className="text-muted">{Number(c.avgDwellTime || 0).toFixed(2)}</td>
-                  </tr>
-                ))}
+                {summary.map((c) => {
+                  const usageScore = Number(c.avgUsageScore || 0);
+                  const borrows = Number(c.avgBorrows || 0);
+                  let interpretation = 'Minimal Usage';
+                  if (usageScore >= 15 && borrows >= 10) interpretation = 'High Usage';
+                  else if (usageScore >= 8 && borrows >= 5) interpretation = 'Moderate Usage';
+                  else if (usageScore > 0) interpretation = 'Low Usage';
+                  return (
+                    <tr key={c._id}>
+                      <td><span className="badge bg-success">Clustered</span></td>
+                      <td className="fw-medium">{c.count}</td>
+                      <td>{Number(c.avgUsageScore || 0).toFixed(2)}</td>
+                      <td>{Number(c.avgRetentionScore || 0).toFixed(2)}</td>
+                      <td>{Number(c.avgBorrows || 0).toFixed(2)}</td>
+                      <td className="text-muted">{Number(c.avgDwellTime || 0).toFixed(2)}</td>
+                      <td><span className="badge bg-primary">{interpretation}</span></td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
