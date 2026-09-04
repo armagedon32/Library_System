@@ -209,24 +209,26 @@ function UserClustering() {
           </div>
           <div className="table-responsive">
             <table className="table table-hover align-middle mb-0">
-              <thead className="table-light">
-                <tr>
-                  <th className="small">User</th>
-                  <th className="small">Dept</th>
-                  <th className="small">Borrows</th>
-                  <th className="small">Renewals</th>
-                  <th className="small">Avg Dwell</th>
-                  <th className="small">Overdue</th>
-                  <th className="small">Categories</th>
-                  <th className="small">Departments</th>
-                  <th className="small"></th>
-                </tr>
-              </thead>
+<thead className="table-light">
+                  <tr>
+                    <th className="small">User</th>
+                    <th className="small">Student ID</th>
+                    <th className="small">Dept</th>
+                    <th className="small">Borrows</th>
+                    <th className="small">Renewals</th>
+                    <th className="small">Avg Dwell</th>
+                    <th className="small">Overdue</th>
+                    <th className="small">Categories</th>
+                    <th className="small">Departments</th>
+                    <th className="small"></th>
+                  </tr>
+                </thead>
               <tbody>
-                {data.clusters.filter((u) => u.cluster === s.cluster).map((u) => (
-                  <tr key={u.userId}>
-                    <td className="fw-medium">{u.name}</td>
-                    <td className="text-muted">{u.department}</td>
+{data.clusters.filter((u) => u.cluster === s.cluster).map((u) => (
+                    <tr key={u.userId}>
+                      <td className="fw-medium">{u.name}</td>
+                      <td className="text-muted small">{u.studentId || '—'}</td>
+                      <td className="text-muted">{u.department}</td>
                     <td>{u.totalBorrows}</td>
                     <td>{u.totalRenewals}</td>
                     <td>{u.avgDwellTime}</td>
