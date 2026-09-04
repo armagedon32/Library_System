@@ -144,4 +144,31 @@ export const uploadItemsCsv = async (file) => {
   return response.data;
 };
 
+export const getBackups = async () => {
+  const response = await api.get('/analytics/backup/list');
+  return response.data;
+};
+
+export const createBackup = async () => {
+  const response = await api.post('/analytics/backup');
+  return response.data;
+};
+
+export const restoreBackup = async (backupName, drop = false) => {
+  const response = await api.post(`/analytics/backup/${backupName}/restore`, { drop });
+  return response.data;
+};
+
+export const deleteBackupApi = async (backupName) => {
+  const response = await api.delete(`/analytics/backup/${backupName}`);
+  return response.data;
+};
+
+export const downloadBackup = async (backupName) => {
+  const response = await api.get(`/analytics/backup/${backupName}/download`, {
+    responseType: 'blob'
+  });
+  return response;
+};
+
 export default api;

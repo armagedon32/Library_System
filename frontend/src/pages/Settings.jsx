@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { updateProfile, changePassword } from '../api/auth';
-import { getSettings, updateSettings } from '../api/analytics';
+import { getSettings, updateSettings, getBackups, createBackup, restoreBackup, deleteBackupApi } from '../api/analytics';
 import { useToast } from '../components/Toast';
 
 const DEPARTMENTS = ['Education', 'BSBA', 'BSHM', 'Computer Science'];
@@ -36,11 +36,68 @@ function Settings() {
   const [settings, setSettings] = useState(null);
   const [savingSettings, setSavingSettings] = useState(false);
 
+  // Backup & Restore (admin only)
+  const [backups, setBackups] = useState([]);
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [restoreLoading, setRestoreLoading] = useState(false);
+
   useEffect(() => {
     if (isAdmin) {
       getSettings().then(setSettings).catch(() => setSettings(null));
     }
   }, [isAdmin]);
+
+  useEffect(() => {
+    if (tab === 'backup' && isAdmin) {
+      loadBackups();
+    }
+  }, [tab, isAdmin]);
+
+  const loadBackups = async () => {
+    try {
+      const data = await getBackups();
+      setBackups(data.backups || []);
+    } catch (err) {
+      console.error('Failed to load backups');
+    }
+  };
+
+  const handleCreateBackup = async () => {
+    setBackupLoading(true);
+    try {
+      await createBackup();
+      addToast('Backup created successfully!', 'success');
+      loadBackups();
+    } catch (err) {
+      addToast(err.response?.data?.message || 'Backup failed', 'danger');
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  const handleRestore = async (backupName) => {
+    if (!confirm(`Are you sure you want to restore from backup "${backupName}"? This will overwrite current data.`)) return;
+    setRestoreLoading(true);
+    try {
+      await restoreBackup(backupName, true);
+      addToast('Restore completed successfully!', 'success');
+    } catch (err) {
+      addToast(err.response?.data?.message || 'Restore failed', 'danger');
+    } finally {
+      setRestoreLoading(false);
+    }
+  };
+
+  const handleDeleteBackup = async (backupName) => {
+    if (!confirm(`Are you sure you want to delete backup "${backupName}"?`)) return;
+    try {
+      await deleteBackupApi(backupName);
+      addToast('Backup deleted successfully!', 'success');
+      loadBackups();
+    } catch (err) {
+      addToast(err.response?.data?.message || 'Delete failed', 'danger');
+    }
+  };
 
   const setGroup = (group, key, value) => {
     setSettings({ ...settings, [group]: { ...settings[group], [key]: value } });
@@ -102,10 +159,11 @@ function Settings() {
       { key: 'notifications', label: 'Notifications', icon: 'bi-bell' },
       { key: 'clustering', label: 'Clustering', icon: 'bi-diagram-3' },
       { key: 'thresholds', label: 'Thresholds', icon: 'bi-sliders' },
+      { key: 'backup', label: 'Backup & Restore', icon: 'bi-cloud-download' },
     ] : []),
   ];
 
-  const isAdminTab = isAdmin && ['borrowing', 'fines', 'reservations', 'notifications', 'clustering', 'thresholds'].includes(tab);
+  const isAdminTab = isAdmin && ['borrowing', 'fines', 'reservations', 'notifications', 'clustering', 'thresholds', 'backup'].includes(tab);
 
   return (
     <div>
@@ -352,6 +410,67 @@ function Settings() {
                   <Field label="Service Per Copy" step="1" value={settings.thresholds.servicePerCopy}
                     hint="Estimated borrows one copy can serve per year (drives Projected Addition)"
                     onChange={(e) => setGroup('thresholds', 'servicePerCopy', parseInt(e.target.value, 10) || 1)} />
+                </div>
+              )}
+              {tab === 'backup' && (
+                <div>
+                  <div className="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                      <h6 className="fw-bold mb-1">Backup & Restore</h6>
+                      <p className="text-muted small mb-0">Create backups or restore from previous backups</p>
+                    </div>
+                    <button className="btn btn-dark btn-sm" onClick={handleCreateBackup} disabled={backupLoading}>
+                      {backupLoading ? (
+                        <><span className="spinner-border spinner-border-sm me-1"></span>Creating...</>
+                      ) : (
+                        <><i className="bi bi-plus-lg me-1"></i>Create Backup</>
+                      )}
+                    </button>
+                  </div>
+
+                  {backups.length === 0 ? (
+                    <div className="text-center py-5 text-muted">
+                      <i className="bi bi-cloud-download fs-1 d-block mb-2"></i>
+                      <p>No backups yet. Create your first backup to protect your data.</p>
+                    </div>
+                  ) : (
+                    <div className="table-responsive">
+                      <table className="table table-hover align-middle">
+                        <thead className="table-light">
+                          <tr>
+                            <th>Backup Name</th>
+                            <th>Documents</th>
+                            <th>Collections</th>
+                            <th className="text-end">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {backups.map((b) => (
+                            <tr key={b.name}>
+                              <td>
+                                <i className="bi bi-archive me-2 text-muted"></i>
+                                {b.name}
+                              </td>
+                              <td>{b.totalDocuments.toLocaleString()}</td>
+                              <td>
+                                {Object.keys(b.collections).map((c) => (
+                                  <span key={c} className="badge bg-light text-dark me-1">{c}</span>
+                                ))}
+                              </td>
+                              <td className="text-end">
+                                <button className="btn btn-outline-success btn-sm me-1" onClick={() => handleRestore(b.name)} disabled={restoreLoading}>
+                                  <i className="bi bi-arrow-counterclockwise me-1"></i>Restore
+                                </button>
+                                <button className="btn btn-outline-danger btn-sm" onClick={() => handleDeleteBackup(b.name)}>
+                                  <i className="bi bi-trash me-1"></i>Delete
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
