@@ -235,7 +235,7 @@ function CollectionItems() {
                     <td><span className={`badge ${statusBadge(item.status)}`}>{item.status}</span></td>
                     <td>{item.usageMetrics.totalBorrows}</td>
                     <td>{item.usageMetrics.usageScore.toFixed(2)}</td>
-                    <td>{item.cluster === -2 ? <span className="badge bg-secondary">New</span> : (item.cluster === -1 ? <span className="badge bg-secondary">Not Clustered</span> : <span className="badge bg-dark">{item.clusterLabel || `Cluster ${item.cluster}`}</span>)}</td>
+                    <td>{item.cluster === -2 ? <span className="badge bg-secondary">New</span> : (item.cluster === -1 ? <span className="badge bg-warning text-dark">Not Yet Clustered</span> : <span className="badge bg-success">Clustered</span>)}</td>
                     <td>
                       <button className="btn btn-sm btn-outline-primary" onClick={() => openBorrowForm(item)}
                         disabled={item.copies < 1} title={item.copies < 1 ? 'No copies available' : 'Borrow this item'}>
