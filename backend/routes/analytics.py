@@ -378,8 +378,43 @@ def run_clustering():
         {'$group': {'_id': '$cluster', 'count': {'$sum': 1}, 'avgUsageScore': {'$avg': '$usageMetrics.usageScore'},
                      'avgRetentionScore': {'$avg': '$usageMetrics.retentionScore'}, 'avgBorrows': {'$avg': '$usageMetrics.totalBorrows'}}}
     ]))
+
+    # Assign meaningful labels to clusters based on usage characteristics
+    cluster_labels = {}
+    for s in stats:
+        cl = s['_id']
+        avg_borrows = s.get('avgBorrows', 0)
+        avg_usage = s.get('avgUsageScore', 0)
+        avg_retention = s.get('avgRetentionScore', 0)
+        
+        # Determine label based on usage metrics
+        if avg_borrows >= 10 and avg_usage >= 15:
+            label = 'Highly Circulated'
+        elif avg_borrows >= 5 and avg_usage >= 8:
+            label = 'Moderately Circulated'
+        elif avg_borrows >= 1:
+            label = 'Low Circulation'
+        else:
+            label = 'Minimal Circulation'
+        
+        cluster_labels[cl] = {
+            'label': label,
+            'avgBorrows': avg_borrows,
+            'avgUsageScore': avg_usage,
+            'avgRetentionScore': avg_retention
+        }
+
+    # Update items with cluster labels
+    for c in clusters:
+        cl = c['cluster']
+        label_info = cluster_labels.get(cl, {'label': f'Cluster {cl}'})
+        mongo.db.collectionitems.update_one(
+            {'_id': ObjectId(c['id'])},
+            {'$set': {'cluster': cl, 'clusterLabel': label_info['label']}}
+        )
+
     log_activity(g.current_user.get('_id'), 'Run Clustering', f'K-Means completed with k={k}, {len(new_items)} new items')
-    return jsonify({'message': 'Clustering completed', 'k': k, 'clusterStats': stats, 'newItemsCount': len(new_items)})
+    return jsonify({'message': 'Clustering completed', 'k': k, 'clusterStats': stats, 'clusterLabels': cluster_labels, 'newItemsCount': len(new_items)})
 
 
 @analytics_bp.route('/clustering/results', methods=['GET'])
@@ -392,6 +427,24 @@ def clustering_results():
                      'avgRetentionScore': {'$avg': '$usageMetrics.retentionScore'},
                      'avgBorrows': {'$avg': '$usageMetrics.totalBorrows'}, 'avgDwellTime': {'$avg': '$usageMetrics.averageDwellTime'}}}
     ]))
+    
+    # Add labels to summary
+    for s in summary:
+        cl = s['_id']
+        avg_borrows = s.get('avgBorrows', 0)
+        avg_usage = s.get('avgUsageScore', 0)
+        avg_retention = s.get('avgRetentionScore', 0)
+        
+        if avg_borrows >= 10 and avg_usage >= 15:
+            label = 'Highly Circulated'
+        elif avg_borrows >= 5 and avg_usage >= 8:
+            label = 'Moderately Circulated'
+        elif avg_borrows >= 1:
+            label = 'Low Circulation'
+        else:
+            label = 'Minimal Circulation'
+        s['label'] = label
+
     new_count = mongo.db.collectionitems.count_documents({'cluster': -2})
     return jsonify({'results': [item_to_dict(i) for i in items], 'summary': summary, 'newItemsCount': new_count})
 

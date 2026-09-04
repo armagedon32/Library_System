@@ -150,7 +150,7 @@ function ClusteringResults() {
               <tbody>
                 {summary.map((c) => (
                   <tr key={c._id}>
-                    <td><span className="badge bg-dark">Cluster {c._id}</span></td>
+                    <td><span className="badge bg-dark">{c.label || `Cluster ${c._id}`}</span></td>
                     <td className="fw-medium">{c.count}</td>
                     <td>{Number(c.avgUsageScore || 0).toFixed(2)}</td>
                     <td>{Number(c.avgRetentionScore || 0).toFixed(2)}</td>
@@ -202,44 +202,47 @@ function ClusteringResults() {
         </div>
       )}
 
-      {results.length > 0 ? (
+{results.length > 0 ? (
         <div className="vstack gap-3">
-          {Object.entries(clusterGroups).map(([clusterId, items]) => (
-            <div key={clusterId} className="card border-0 shadow-sm">
-              <div className="card-header bg-white pt-4 px-4 border-bottom-0">
-                <h6 className="fw-bold mb-0">
-                  <i className="bi bi-diagram-3 me-2"></i>Cluster {clusterId}
-                  <span className="badge bg-secondary ms-2">{items.length} items</span>
-                </h6>
-              </div>
-              <div className="table-responsive">
-                <table className="table table-hover align-middle mb-0">
-                  <thead className="table-light">
-                    <tr>
-                      <th className="small fw-semibold">Title</th>
-                      <th className="small fw-semibold">Author</th>
-                      <th className="small fw-semibold">Category</th>
-                      <th className="small fw-semibold">Department</th>
-                      <th className="small fw-semibold">Borrows</th>
-                      <th className="small fw-semibold">Usage Score</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.map((item) => (
-                      <tr key={item._id}>
-                        <td className="fw-medium">{item.title}</td>
-                        <td className="text-muted">{item.author}</td>
-                        <td className="text-muted">{item.category}</td>
-                        <td className="text-muted">{item.department}</td>
-                        <td>{item.usageMetrics.totalBorrows}</td>
-                        <td>{item.usageMetrics.usageScore.toFixed(2)}</td>
+          {Object.entries(clusterGroups).map(([clusterId, items]) => {
+            const clusterLabel = summary.find(s => s._id === parseInt(clusterId))?.label || `Cluster ${clusterId}`;
+            return (
+              <div key={clusterId} className="card border-0 shadow-sm">
+                <div className="card-header bg-white pt-4 px-4 border-bottom-0">
+                  <h6 className="fw-bold mb-0">
+                    <i className="bi bi-diagram-3 me-2"></i>{clusterLabel}
+                    <span className="badge bg-secondary ms-2">{items.length} items</span>
+                  </h6>
+                </div>
+                <div className="table-responsive">
+                  <table className="table table-hover align-middle mb-0">
+                    <thead className="table-light">
+                      <tr>
+                        <th className="small fw-semibold">Title</th>
+                        <th className="small fw-semibold">Author</th>
+                        <th className="small fw-semibold">Category</th>
+                        <th className="small fw-semibold">Department</th>
+                        <th className="small fw-semibold">Borrows</th>
+                        <th className="small fw-semibold">Usage Score</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {items.map((item) => (
+                        <tr key={item._id}>
+                          <td className="fw-medium">{item.title}</td>
+                          <td className="text-muted">{item.author}</td>
+                          <td className="text-muted">{item.category}</td>
+                          <td className="text-muted">{item.department}</td>
+                          <td>{item.usageMetrics.totalBorrows}</td>
+                          <td>{item.usageMetrics.usageScore.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="card border-0 shadow-sm text-center p-5">
