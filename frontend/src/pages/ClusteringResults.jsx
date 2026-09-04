@@ -117,6 +117,51 @@ function ClusteringResults() {
         </div>
       )}
 
+      {kValue && (
+        <div className="card border-0 shadow-sm mb-4">
+          <div className="card-header bg-white pt-4 px-4 border-bottom-0">
+            <h6 className="fw-bold mb-0"><i className="bi bi-graph-up me-2"></i>Clustering Validation</h6>
+            <small className="text-muted">Quality metrics for the K-Means clustering</small>
+          </div>
+          <div className="card-body">
+            <div className="row g-3">
+              <div className="col-md-6">
+                <div className="border rounded-3 p-3 text-center h-100">
+                  <div className="text-muted small fw-medium mb-1"><i className="bi bi-bounding-box me-1"></i>Silhouette Score</div>
+                  <div className={`display-6 fw-bold ${data.metrics?.silhouette >= 0.5 ? 'text-success' : data.metrics?.silhouette >= 0.25 ? 'text-primary' : 'text-warning'}`}>
+                    {data.metrics?.silhouette != null ? data.metrics.silhouette.toFixed(4) : '\u2014'}
+                  </div>
+                  <div className="small text-muted mt-1">
+                    {data.metrics?.silhouette != null
+                      ? (data.metrics.silhouette >= 0.5 ? 'Strong separation' : data.metrics.silhouette >= 0.25 ? 'Moderate separation' : 'Weak separation')
+                      : 'Not computed'}
+                  </div>
+                </div>
+              </div>
+              <div className="col-md-6">
+                <div className="border rounded-3 p-3 text-center h-100">
+                  <div className="text-muted small fw-medium mb-1"><i className="bi bi-bounding-box me-1"></i>Davies\u2013Bouldin Index</div>
+                  <div className={`display-6 fw-bold ${data.metrics?.daviesBouldin != null && data.metrics?.daviesBouldin < 1 ? 'text-success' : 'text-warning'}`}>
+                    {data.metrics?.daviesBouldin != null ? data.metrics.daviesBouldin.toFixed(4) : '\u2014'}
+                  </div>
+                  <div className="small text-muted mt-1">
+                    {data.metrics?.daviesBouldin != null
+                      ? (data.metrics.daviesBouldin < 1 ? 'Compact clusters' : 'High overlap')
+                      : 'Not computed'}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="mt-3">
+              <small className="text-muted">
+                <strong>K Selection:</strong> Heuristic Method (Elbow-inspired formula)<br />
+                Silhouette Score ranges from \u22121 to 1 (higher = well separated). Davies\u2013Bouldin Index lower-is-better (compact clusters).
+              </small>
+            </div>
+          </div>
+        </div>
+      )}
+
       {summary.length > 0 && (
         <div className="card border-0 shadow-sm mb-4">
           <div className="card-header bg-white pt-4 px-4 border-bottom-0">
