@@ -13,6 +13,8 @@ function UserClustering() {
   const [recUser, setRecUser] = useState(null);
   const [recs, setRecs] = useState([]);
   const [recLoading, setRecLoading] = useState(false);
+  const [kValue, setKValue] = useState(null);
+  const [kMethod, setKMethod] = useState('Heuristic: K = 2 if active users < 6 else 3');
 
   useEffect(() => {
     getUserClustering()
@@ -26,6 +28,7 @@ function UserClustering() {
     try {
       const fresh = await getUserClustering();
       setData(fresh);
+      if (fresh.k) setKValue(fresh.k);
     } catch (e) {
       addToast('Failed to load user clusters', 'danger');
     } finally {
@@ -36,8 +39,9 @@ function UserClustering() {
   const handleRunClustering = async () => {
     setRunning(true);
     try {
-      await runUserClustering();
+      const result = await runUserClustering();
       addToast('User clustering completed successfully!', 'success');
+      if (result.k) setKValue(result.k);
       await loadData();
     } catch (error) {
       addToast(error.response?.data?.message || 'Failed to run clustering', 'danger');
@@ -141,6 +145,26 @@ function UserClustering() {
           )}
         </button>
       </div>
+
+      {kValue && (
+        <div className="card border-0 shadow-sm mb-4">
+          <div className="card-header bg-white pt-4 px-4 border-bottom-0">
+            <h6 className="fw-bold mb-0"><i className="bi bi-123 me-2"></i>Selected K Value</h6>
+          </div>
+          <div className="card-body">
+            <div className="row g-3 align-items-center">
+              <div className="col-md-4 text-center">
+                <div className="display-4 fw-bold text-primary">{kValue}</div>
+                <small className="text-muted">Number of Clusters (K)</small>
+              </div>
+              <div className="col-md-8">
+                <h6 className="small fw-semibold text-muted mb-2">K Selection Method</h6>
+                <p className="small mb-0">{kMethod}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="card border-0 shadow-sm mb-4">
         <div className="card-header bg-white pt-4 px-4 border-bottom-0">

@@ -11,6 +11,8 @@ function ClusteringResults() {
   const [summary, setSummary] = useState([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
+  const [kValue, setKValue] = useState(null);
+  const [kMethod, setKMethod] = useState('Heuristic: k = max(2, min(5, √n // 3 + 1)) where n = items with usage data');
 
   useEffect(() => {
     const auto = async () => {
@@ -38,6 +40,7 @@ function ClusteringResults() {
       const data = await getClusteringResults();
       setResults(data.results || []);
       setSummary(data.summary || []);
+      if (data.k) setKValue(data.k);
     } catch (error) {
       console.error(error);
     } finally {
@@ -48,8 +51,9 @@ function ClusteringResults() {
   const handleRunClustering = async () => {
     setRunning(true);
     try {
-      await runClustering();
+      const data = await runClustering();
       addToast('K-Means clustering completed successfully!', 'success');
+      if (data.k) setKValue(data.k);
       await loadResults();
     } catch (error) {
       addToast(error.response?.data?.message || 'Failed to run clustering', 'danger');
@@ -92,6 +96,26 @@ function ClusteringResults() {
           )}
         </button>
       </div>
+
+      {kValue && (
+        <div className="card border-0 shadow-sm mb-4">
+          <div className="card-header bg-white pt-4 px-4 border-bottom-0">
+            <h6 className="fw-bold mb-0"><i className="bi bi-123 me-2"></i>Selected K Value</h6>
+          </div>
+          <div className="card-body">
+            <div className="row g-3 align-items-center">
+              <div className="col-md-4 text-center">
+                <div className="display-4 fw-bold text-primary">{kValue}</div>
+                <small className="text-muted">Number of Clusters (K)</small>
+              </div>
+              <div className="col-md-8">
+                <h6 className="small fw-semibold text-muted mb-2">K Selection Method</h6>
+                <p className="small mb-0">{kMethod}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {summary.length > 0 && (
         <div className="card border-0 shadow-sm mb-4">
