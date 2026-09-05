@@ -94,6 +94,19 @@ function ClusteringResults() {
     }
   });
 
+  const getClusterUsage = (clusterId) => {
+    const stat = summary.find(s => Number(s._id) === Number(clusterId));
+    if (!stat) return null;
+    const usageScore = Number(stat.avgUsageScore || 0);
+    const borrows = Number(stat.avgBorrows || 0);
+    let interpretation = 'Minimal Usage';
+    let color = 'bg-secondary';
+    if (usageScore >= 15 && borrows >= 10) { interpretation = 'High Usage'; color = 'bg-success'; }
+    else if (usageScore >= 8 && borrows >= 5) { interpretation = 'Moderate Usage'; color = 'bg-primary'; }
+    else if (usageScore > 0) { interpretation = 'Low Usage'; color = 'bg-warning text-dark'; }
+    return { interpretation, color };
+  };
+
   return (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
@@ -397,12 +410,18 @@ function ClusteringResults() {
 {results.length > 0 ? (
         <div className="vstack gap-3">
 {Object.entries(clusterGroups).map(([clusterId, items]) => {
+              const usage = getClusterUsage(clusterId);
               return (
                 <div key={clusterId} className="card border-0 shadow-sm">
-                  <div className="card-header bg-white pt-4 px-4 border-bottom-0">
+                  <div className="card-header bg-white pt-4 px-4 border-bottom-0 d-flex align-items-center justify-content-between flex-wrap gap-2">
                     <h6 className="fw-bold mb-0">
                       <i className="bi bi-diagram-3 me-2"></i>Clustered
                       <span className="badge bg-secondary ms-2">{items.length} items</span>
+                      {usage && (
+                        <span className={`badge ${usage.color} ms-2`}>
+                          <i className="bi bi-graph-up me-1"></i>{usage.interpretation}
+                        </span>
+                      )}
                     </h6>
                 </div>
                 <div className="table-responsive">
