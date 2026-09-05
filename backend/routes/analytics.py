@@ -853,25 +853,12 @@ def user_clustering():
         else:
             seg['segment'] = f'Cluster {cl}'
 
-    # Rank clusters by intensity to give meaningful labels
-    label_by_cluster = {}
-    cl_avg = {}
-    for cl in [0, 1, 2]:
-        members = [s for s in segments if s['cluster'] == cl]
-        if members:
-            cl_avg[cl] = sum(m['totalBorrows'] for m in members) / len(members)
-    if cl_avg:
-        ranked = sorted(cl_avg.items(), key=lambda x: -x[1])
-        labels = ['High Demand', 'Active Borrower', 'Light User']
-        for i, (cl, _) in enumerate(ranked):
-            label_by_cluster[cl] = labels[i] if i < 3 else f'Cluster {cl}'
-        for seg in segments:
-            if seg['cluster'] in label_by_cluster:
-                seg['segment'] = label_by_cluster[seg['cluster']]
-    else:
-        for seg in segments:
-            if seg['cluster'] >= 0:
-                seg['segment'] = f'Cluster {seg["cluster"]}'
+    # Fixed mapping of cluster number to segment label
+    label_by_cluster = {0: 'Light User', 1: 'Active Borrower', 2: 'High Demand'}
+    for seg in segments:
+        cl = seg['cluster']
+        if cl >= 0:
+            seg['segment'] = label_by_cluster.get(cl, f'Cluster {cl}')
 
     summary = []
     for cl in [-1, 0, 1, 2]:
@@ -986,24 +973,7 @@ def run_user_clustering():
             metrics['silhouette'] = round(sil, 4) if sil is not None else None
             metrics['daviesBouldin'] = round(dbi, 4) if dbi is not None else None
     
-    label_by_cluster = {}
-    cl_avg = {}
-    for cl in [0, 1, 2]:
-        members = [s for s in segments if s['cluster'] == cl]
-        if members:
-            cl_avg[cl] = sum(m['totalBorrows'] for m in members) / len(members)
-    if cl_avg:
-        ranked = sorted(cl_avg.items(), key=lambda x: -x[1])
-        labels = ['High Demand', 'Active Borrower', 'Light User']
-        for i, (cl, _) in enumerate(ranked):
-            label_by_cluster[cl] = labels[i] if i < 3 else f'Cluster {cl}'
-        for seg in segments:
-            if seg['cluster'] in label_by_cluster:
-                seg['segment'] = label_by_cluster[seg['cluster']]
-    else:
-        for seg in segments:
-            if seg['cluster'] >= 0:
-                seg['segment'] = f'Cluster {seg["cluster"]}'
+    label_by_cluster = {0: 'Light User', 1: 'Active Borrower', 2: 'High Demand'}
     
     # Save cluster assignments to database
     for seg in segments:

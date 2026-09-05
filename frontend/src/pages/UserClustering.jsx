@@ -437,6 +437,7 @@ function UserClustering() {
                     <th className="small fw-semibold">Borrowings</th>
                     <th className="small fw-semibold">Renewals</th>
                     <th className="small fw-semibold">Usage</th>
+                    <th className="small fw-semibold">Cluster No.</th>
                     <th className="small fw-semibold">Cluster</th>
                   </tr>
                 </thead>
@@ -448,6 +449,7 @@ function UserClustering() {
                       <td>{u.totalBorrows}</td>
                       <td>{u.totalRenewals}</td>
                       <td>{u.avgDwellTime}</td>
+                      <td className="text-center fw-medium">{u.cluster >= 0 ? u.cluster : '-'}</td>
                       <td>
                         {u.cluster === -1 ? (
                           <span className="badge bg-warning text-dark">Not Clustered</span>
