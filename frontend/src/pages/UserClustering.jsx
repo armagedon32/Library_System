@@ -80,7 +80,8 @@ function UserClustering() {
     );
   }
 
-  const pieData = data.summary.map((s) => ({ name: s.label, value: s.count }));
+  const pieData = data.summary.map((s) => ({ name: `Cluster ${s.cluster} \u2013 ${s.label}`, value: s.count }));
+  const chartData = data.summary.map((s) => ({ ...s, chartName: `Cluster ${s.cluster} \u2013 ${s.label}` }));
 
   const renderModal = () => {
     if (!recUser) return null;
@@ -307,9 +308,9 @@ function UserClustering() {
             </div>
             <div className="card-body">
               <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={data.summary}>
+                <BarChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="label" />
+                  <XAxis dataKey="chartName" tick={{ fontSize: 12 }} />
                   <YAxis allowDecimals={false} />
                   <Tooltip />
                   <Legend />
@@ -326,9 +327,9 @@ function UserClustering() {
             </div>
             <div className="card-body">
               <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={data.summary}>
+                <BarChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="label" />
+                  <XAxis dataKey="chartName" tick={{ fontSize: 12 }} />
                   <YAxis />
                   <Tooltip />
                   <Legend />
