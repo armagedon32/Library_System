@@ -456,50 +456,6 @@ function UserClustering() {
         </div>
       </div>
 
-      <div className="row g-4 mb-4">
-        <div className="col-lg-5">
-          <div className="card border-0 shadow-sm h-100">
-            <div className="card-header bg-white pt-4 px-4 border-bottom-0">
-              <h6 className="fw-bold mb-0">Clustering Validation Metrics</h6>
-              <small className="text-muted">Statistical validation of the segmentation quality</small>
-            </div>
-            <div className="card-body">
-              <div className="row g-3">
-                <div className="col-6">
-                  <div className="border rounded-3 p-3 text-center h-100">
-                    <div className="text-muted small fw-medium mb-1"><i className="bi bi-bounding-box me-1"></i>Silhouette Score</div>
-                    <div className={`display-6 fw-bold ${data.metrics.silhouette >= 0.5 ? 'text-success' : data.metrics.silhouette >= 0.25 ? 'text-primary' : 'text-warning'}`}>
-                      {data.metrics.silhouette != null ? data.metrics.silhouette.toFixed(4) : '\u2014'}
-                    </div>
-                    <div className="small text-muted mt-1">
-                      {data.metrics.silhouette != null
-                        ? (data.metrics.silhouette >= 0.5 ? 'Strong separation' : data.metrics.silhouette >= 0.25 ? 'Moderate separation' : 'Weak separation')
-                        : 'Not computed'}
-                    </div>
-                  </div>
-                </div>
-                <div className="col-6">
-                  <div className="border rounded-3 p-3 text-center h-100">
-                    <div className="text-muted small fw-medium mb-1"><i className="bi bi-bounding-box me-1"></i>Davies\u2013Bouldin Index</div>
-                    <div className={`display-6 fw-bold ${data.metrics.daviesBouldin != null && data.metrics.daviesBouldin < 1 ? 'text-success' : 'text-warning'}`}>
-                      {data.metrics.daviesBouldin != null ? data.metrics.daviesBouldin.toFixed(4) : '\u2014'}
-                    </div>
-                    <div className="small text-muted mt-1">
-                      {data.metrics.daviesBouldin != null
-                        ? (data.metrics.daviesBouldin < 1 ? 'Compact clusters' : 'High overlap')
-                        : 'Not computed'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <p className="text-muted small mb-0 mt-3">
-                Silhouette Score ranges from \u22121 to 1 (higher = clusters are well separated). The Davies\u2013Bouldin Index is lower-is-better (clusters are compact and far apart). K = {data.k ?? data.metrics.k}.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {renderModal()}
     </div>
   );
