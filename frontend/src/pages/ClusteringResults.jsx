@@ -293,6 +293,23 @@ function ClusteringResults() {
         </div>
       )}
 
+      {(!kValue && summary.length === 0 && newItems.length === 0) && (
+        <div className="card border-0 shadow-sm mb-4">
+          <div className="card-body text-center py-5">
+            <i className="bi bi-diagram-3 text-muted" style={{ fontSize: '3rem' }}></i>
+            <h5 className="text-muted mt-3 mb-2">No Clustering Data Yet</h5>
+            <p className="text-muted small mb-3">Run clustering to group books by usage patterns and content.</p>
+            <button className="btn btn-dark btn-sm" onClick={handleRunClustering} disabled={running}>
+              {running ? (
+                <><span className="spinner-border spinner-border-sm me-1"></span>Running...</>
+              ) : (
+                <><i className="bi bi-play-fill me-1"></i>Run Clustering</>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
       {newItems.length > 0 && (
         <div className="card border-0 shadow-sm mb-4">
           <div className="card-header bg-white pt-4 px-4 border-bottom-0">
