@@ -854,7 +854,7 @@ def user_clustering():
             seg['segment'] = f'Cluster {cl}'
 
     # Fixed mapping of cluster number to segment label
-    label_by_cluster = {0: 'Light User', 1: 'Active Borrower', 2: 'High Demand'}
+    label_by_cluster = {0: 'High Demand', 1: 'Active Borrower', 2: 'Light User'}
     for seg in segments:
         cl = seg['cluster']
         if cl >= 0:
@@ -973,7 +973,7 @@ def run_user_clustering():
             metrics['silhouette'] = round(sil, 4) if sil is not None else None
             metrics['daviesBouldin'] = round(dbi, 4) if dbi is not None else None
     
-    label_by_cluster = {0: 'Light User', 1: 'Active Borrower', 2: 'High Demand'}
+    label_by_cluster = {0: 'High Demand', 1: 'Active Borrower', 2: 'Light User'}
     
     # Save cluster assignments to database
     for seg in segments:
@@ -1109,7 +1109,7 @@ def recommend_for_me():
             'category': item.get('category'), 'department': item.get('department'),
             'copies': item.get('copies', 1),
             'score': round(score, 2),
-            'reason': ' · '.join(reasons[:2]) if reasons else 'Recommended for you'
+            'reason': ' Â· '.join(reasons[:2]) if reasons else 'Recommended for you'
         })
 
     recs.sort(key=lambda r: -r['score'])
@@ -1153,7 +1153,7 @@ def collection_decisions():
         if borrows >= keep_threshold:
             return 'Retain', 'success', 'High performing item'
         if cluster == -2 or (borrows == 0 and age < 5):
-            return 'Monitor', 'secondary', 'Newly acquired — track usage'
+            return 'Monitor', 'secondary', 'Newly acquired â€” track usage'
         if borrows <= 2 and age >= 5:
             return 'Weed / Deselect', 'danger', f'Low usage, {age} yrs old'
         if borrows <= 2:
