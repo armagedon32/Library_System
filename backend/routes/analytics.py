@@ -342,13 +342,13 @@ def get_item(item_id):
 @analytics_bp.route('/clustering/run', methods=['POST'])
 @admin_required
 def run_clustering():
-    all_items = list(mongo.db.collectionitems.find({'status': 'Active'}))
+    all_items = list(mongo.db.collectionitems.find({}))
 
     # Separate items with usage data vs new items
     has_usage = []
     new_items = []
     for item in all_items:
-        m = item.get('usageMetrics', {})
+        m = item.get('usageMetrics', {}) or {}
         if m.get('totalBorrows', 0) == 0 and m.get('totalRenewals', 0) == 0 and m.get('averageDwellTime', 0) == 0:
             new_items.append(item)
         else:
@@ -358,20 +358,61 @@ def run_clustering():
     for item in new_items:
         mongo.db.collectionitems.update_one(
             {'_id': ObjectId(item['_id'])},
-            {'$set': {'cluster': -2}}
+            {'$set': {'cluster': -2, 'clusterLabel': 'New'}}
         )
 
+    metrics = {'silhouette': None, 'daviesBouldin': None, 'k': 0}
     if len(has_usage) < 3:
-        return jsonify({'message': 'Clustering completed', 'k': 0, 'clusterStats': [],
+        meta = {'k': 0, 'metrics': metrics, 'newItemsCount': len(new_items), 'updatedAt': datetime.utcnow()}
+        mongo.db.cluster_meta.update_one({'scope': 'book'}, {'$set': meta}, upsert=True)
+        return jsonify({'message': 'Clustering completed', 'k': 0, 'clusterStats': [], 'metrics': metrics,
                         'newItemsCount': len(new_items)})
 
     k = max(2, min(5, int(len(has_usage) ** 0.5 // 3 + 1)))
-    clusters = run_kmeans(has_usage, k)
-    if not clusters:
+    res = run_kmeans(has_usage, k)
+    if not res:
         return jsonify({'message': 'Clustering failed'}), 500
+    clusters = res['assignments']
 
+    # Compute validation metrics
+    sil = silhouette_score(res['normalized'], res['labels'])
+    dbi = davies_bouldin_index(res['normalized'], res['labels'])
+    metrics = {'silhouette': round(sil, 4) if sil is not None else None,
+               'daviesBouldin': round(dbi, 4) if dbi is not None else None,
+               'k': k}
+
+    # Assign cluster numbers to all items with usage data
     for c in clusters:
         mongo.db.collectionitems.update_one({'_id': ObjectId(c['id'])}, {'$set': {'cluster': c['cluster']}})
+
+    # Cluster labels based on usage characteristics
+    total_by_cluster = {}
+    for c in clusters:
+        total_by_cluster[c['cluster']] = total_by_cluster.get(c['cluster'], 0) + 1
+
+    avg_borrows_by_cluster = {}
+    for c in clusters:
+        item_data = next((i for i in has_usage if str(i['_id']) == c['id']), {})
+        m = item_data.get('usageMetrics', {}) or {}
+        avg_borrows_by_cluster[c['cluster']] = avg_borrows_by_cluster.get(c['cluster'], [])
+        avg_borrows_by_cluster[c['cluster']].append(m.get('totalBorrows', 0))
+
+    cluster_labels = {}
+    for cl, borrows in avg_borrows_by_cluster.items():
+        avg_borrows = sum(borrows) / len(borrows) if borrows else 0
+        if avg_borrows >= 10:
+            label = 'Highly Circulated'
+        elif avg_borrows >= 5:
+            label = 'Moderately Circulated'
+        elif avg_borrows >= 1:
+            label = 'Low Circulation'
+        else:
+            label = 'Minimal Circulation'
+        cluster_labels[cl] = {'label': label, 'count': total_by_cluster.get(cl, 0), 'avgBorrows': avg_borrows}
+        mongo.db.collectionitems.update_many(
+            {'cluster': cl},
+            {'$set': {'clusterLabel': label}}
+        )
 
     stats = list(mongo.db.collectionitems.aggregate([
         {'$match': {'cluster': {'$gte': 0}}},
@@ -379,42 +420,12 @@ def run_clustering():
                      'avgRetentionScore': {'$avg': '$usageMetrics.retentionScore'}, 'avgBorrows': {'$avg': '$usageMetrics.totalBorrows'}}}
     ]))
 
-    # Assign meaningful labels to clusters based on usage characteristics
-    cluster_labels = {}
-    for s in stats:
-        cl = s['_id']
-        avg_borrows = s.get('avgBorrows', 0)
-        avg_usage = s.get('avgUsageScore', 0)
-        avg_retention = s.get('avgRetentionScore', 0)
-        
-        # Determine label based on usage metrics
-        if avg_borrows >= 10 and avg_usage >= 15:
-            label = 'Highly Circulated'
-        elif avg_borrows >= 5 and avg_usage >= 8:
-            label = 'Moderately Circulated'
-        elif avg_borrows >= 1:
-            label = 'Low Circulation'
-        else:
-            label = 'Minimal Circulation'
-        
-        cluster_labels[cl] = {
-            'label': label,
-            'avgBorrows': avg_borrows,
-            'avgUsageScore': avg_usage,
-            'avgRetentionScore': avg_retention
-        }
-
-    # Update items with cluster labels
-    for c in clusters:
-        cl = c['cluster']
-        label_info = cluster_labels.get(cl, {'label': f'Cluster {cl}'})
-        mongo.db.collectionitems.update_one(
-            {'_id': ObjectId(c['id'])},
-            {'$set': {'cluster': cl, 'clusterLabel': label_info['label']}}
-        )
+    meta = {'k': k, 'metrics': metrics, 'newItemsCount': len(new_items), 'updatedAt': datetime.utcnow()}
+    mongo.db.cluster_meta.update_one({'scope': 'book'}, {'$set': meta}, upsert=True)
 
     log_activity(g.current_user.get('_id'), 'Run Clustering', f'K-Means completed with k={k}, {len(new_items)} new items')
-    return jsonify({'message': 'Clustering completed', 'k': k, 'clusterStats': stats, 'clusterLabels': cluster_labels, 'newItemsCount': len(new_items)})
+    return jsonify({'message': 'Clustering completed', 'k': k, 'clusterStats': stats,
+                    'clusterLabels': cluster_labels, 'metrics': metrics, 'newItemsCount': len(new_items)})
 
 
 @analytics_bp.route('/clustering/results', methods=['GET'])
@@ -446,7 +457,11 @@ def clustering_results():
         s['label'] = label
 
     new_count = mongo.db.collectionitems.count_documents({'cluster': -2})
-    return jsonify({'results': [item_to_dict(i) for i in items], 'summary': summary, 'newItemsCount': new_count})
+    meta = mongo.db.cluster_meta.find_one({'scope': 'book'})
+    k = meta.get('k') if meta else None
+    metrics = meta.get('metrics') if meta else None
+    return jsonify({'results': [item_to_dict(i) for i in items], 'summary': summary,
+                    'newItemsCount': new_count, 'k': k, 'metrics': metrics})
 
 
 @analytics_bp.route('/recommendations', methods=['GET'])

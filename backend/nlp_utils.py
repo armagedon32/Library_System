@@ -198,7 +198,7 @@ def run_kmeans(items, k):
 
     features = [get_features(item) for item in items]
     if not features:
-        return []
+        return None
 
     n_features = len(features[0])
     maxes = [max(f[i] for f in features) for i in range(n_features)]
@@ -241,7 +241,12 @@ def run_kmeans(items, k):
             if members:
                 centroids[ci] = [sum(m[j] for m in members) / len(members) for j in range(len(members[0]))]
 
-    return [{'id': str(items[i]['_id']), 'cluster': clusters[i]} for i in range(n)]
+    return {
+        'assignments': [{'id': str(items[i]['_id']), 'cluster': clusters[i]} for i in range(n)],
+        'labels': clusters,
+        'normalized': normalized,
+        'centroids': centroids,
+    }
 
 
 def kmeans_feature(points, k):
