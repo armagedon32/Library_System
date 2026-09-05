@@ -44,7 +44,15 @@ function UserClustering() {
       if (result.k) setKValue(result.k);
       await loadData();
     } catch (error) {
-      addToast(error.response?.data?.message || 'Failed to run clustering', 'danger');
+      let message = 'Failed to run clustering';
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        message = 'Clustering timed out. Please try again.';
+      } else if (error.response?.data?.message) {
+        message = error.response.data.message;
+      } else if (error.message) {
+        message = error.message;
+      }
+      addToast(message, 'danger');
     } finally {
       setRunning(false);
     }
