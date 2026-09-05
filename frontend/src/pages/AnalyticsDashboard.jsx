@@ -15,7 +15,7 @@ function AnalyticsDashboard() {
   const [borrowerSearch, setBorrowerSearch] = useState('');
   const [allSearch, setAllSearch] = useState('');
   const [loading, setLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState('30d');
+  const [timeRange, setTimeRange] = useState('');
   const [showAllItems, setShowAllItems] = useState(false);
 
   useEffect(() => {
@@ -56,6 +56,7 @@ function AnalyticsDashboard() {
           onChange={(e) => setTimeRange(e.target.value)}
           className="form-select form-select-sm" style={{ width: 'auto' }}
         >
+          <option value="">All time</option>
           <option value="7d">Last 7 days</option>
           <option value="30d">Last 30 days</option>
           <option value="90d">Last 90 days</option>
