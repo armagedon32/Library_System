@@ -239,9 +239,7 @@ function ClusteringResults() {
                     <Tooltip />
                   </PieChart>
                 </ResponsiveContainer>
-              </div>
-              <div className="col-md-6">
-                <h6 className="small text-muted mb-3">Avg Usage Score per Cluster</h6>
+                <h6 className="small text-muted mb-3 mt-4">Avg Usage Score per Cluster</h6>
                 <ResponsiveContainer width="100%" height={180}>
                   <BarChart data={summary}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -251,6 +249,46 @@ function ClusteringResults() {
                     <Bar dataKey="avgUsageScore" fill="#6366f1" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
+              </div>
+              <div className="col-md-7">
+                <h6 className="small text-muted mb-3">Cluster Characteristics — Average behavioral profile per segment</h6>
+                <div className="table-responsive">
+                  <table className="table table-hover align-middle mb-0">
+                    <thead className="table-light">
+                      <tr>
+                        <th className="small fw-semibold">Cluster</th>
+                        <th className="small fw-semibold">Items</th>
+                        <th className="small fw-semibold">Avg Usage Score</th>
+                        <th className="small fw-semibold">Avg Retention</th>
+                        <th className="small fw-semibold">Avg Borrows</th>
+                        <th className="small fw-semibold">Avg Dwell Time</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {summary.map((c) => {
+                        const usageScore = Number(c.avgUsageScore || 0);
+                        const borrows = Number(c.avgBorrows || 0);
+                        let interpretation = 'Minimal Circulation';
+                        if (borrows >= 10) interpretation = 'Highly Circulated';
+                        else if (borrows >= 5) interpretation = 'Moderately Circulated';
+                        else if (borrows >= 1) interpretation = 'Low Circulation';
+                        return (
+                          <tr key={c._id}>
+                            <td>
+                              <span className="badge bg-success me-1">Cluster {c._id}</span>
+                              <span className="badge bg-primary">{interpretation}</span>
+                            </td>
+                            <td className="fw-medium">{c.count}</td>
+                            <td>{Number(c.avgUsageScore || 0).toFixed(2)}</td>
+                            <td>{Number(c.avgRetentionScore || 0).toFixed(2)}</td>
+                            <td>{Number(c.avgBorrows || 0).toFixed(2)}</td>
+                            <td className="text-muted">{Number(c.avgDwellTime || 0).toFixed(2)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
