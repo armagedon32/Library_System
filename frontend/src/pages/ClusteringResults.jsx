@@ -116,7 +116,7 @@ function ClusteringResults() {
         </div>
         <div className="d-flex align-items-center gap-3">
           <span className={`badge ${running ? 'bg-info' : kValue ? 'bg-success' : 'bg-warning text-dark'} fs-6`}>
-            Clustering Status: {running ? <><span className="spinner-border spinner-border-sm me-1"></span>Running...</> : kValue ? <><i className="bi bi-check-circle me-1"></i>Completed \u2713</> : <><i className="bi bi-circle me-1"></i>Not Yet Run</>}
+            Clustering Status: {running ? <><span className="spinner-border spinner-border-sm me-1"></span>Running...</> : kValue ? <><i className="bi bi-check-circle me-1"></i>Completed {'\u2713'}</> : <><i className="bi bi-circle me-1"></i>Not Yet Run</>}
           </span>
           <button className="btn btn-outline-secondary btn-sm" onClick={loadResults} disabled={loading || running} title="Refresh data">
             <i className="bi bi-arrow-clockwise me-1"></i>Refresh
@@ -174,7 +174,7 @@ function ClusteringResults() {
               </div>
               <div className="col-md-6">
                 <div className="border rounded-3 p-3 text-center h-100">
-                  <div className="text-muted small fw-medium mb-1"><i className="bi bi-bounding-box me-1"></i>Davies\u2013Bouldin Index</div>
+                  <div className="text-muted small fw-medium mb-1"><i className="bi bi-bounding-box me-1"></i>Davies{'\u2013'}Bouldin Index</div>
                   <div className={`display-6 fw-bold ${metrics?.daviesBouldin != null && metrics?.daviesBouldin < 1 ? 'text-success' : 'text-warning'}`}>
                     {metrics?.daviesBouldin != null ? metrics.daviesBouldin.toFixed(4) : '\u2014'}
                   </div>
@@ -189,7 +189,7 @@ function ClusteringResults() {
             <div className="mt-3">
               <small className="text-muted">
                 <strong>K Selection:</strong> Heuristic Method (Elbow-inspired formula)<br />
-                Silhouette Score ranges from \u22121 to 1 (higher = well separated). Davies\u2013Bouldin Index lower-is-better (compact clusters).
+                Silhouette Score ranges from {'\u2212'}1 to 1 (higher = well separated). Davies{'\u2013'}Bouldin Index lower-is-better (compact clusters).
               </small>
             </div>
           </div>

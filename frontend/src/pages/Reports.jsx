@@ -254,7 +254,7 @@ function Reports() {
             <tbody>
               {(userSeg.summary || []).map((s, i) => (
                 <tr key={s.cluster}>
-                  <td className="fw-medium"><span className="badge me-2" style={{ backgroundColor: CLUSTER_COLORS[i % CLUSTER_COLORS.length] }}>Cluster {s.cluster} \u2013 {s.label}</span></td>
+                  <td className="fw-medium"><span className="badge me-2" style={{ backgroundColor: CLUSTER_COLORS[i % CLUSTER_COLORS.length] }}>Cluster {s.cluster} {'\u2013'} {s.label}</span></td>
                   <td className="text-end">{s.count}</td>
                   <td className="text-end">{s.avgBorrows}</td>
                   <td className="text-end">{s.avgRenewals != null ? s.avgRenewals : '—'}</td>

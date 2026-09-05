@@ -148,7 +148,7 @@ function UserClustering() {
         </div>
         <div className="d-flex align-items-center gap-3">
           <span className={`badge ${running ? 'bg-info' : kValue ? 'bg-success' : 'bg-warning text-dark'} fs-6`}>
-            Clustering Status: {running ? <><span className="spinner-border spinner-border-sm me-1"></span>Running...</> : kValue ? <><i className="bi bi-check-circle me-1"></i>Completed \u2713</> : <><i className="bi bi-circle me-1"></i>Not Yet Run</>}
+            Clustering Status: {running ? <><span className="spinner-border spinner-border-sm me-1"></span>Running...</> : kValue ? <><i className="bi bi-check-circle me-1"></i>Completed {'\u2713'}</> : <><i className="bi bi-circle me-1"></i>Not Yet Run</>}
           </span>
           <button className="btn btn-dark btn-sm" onClick={handleRunClustering} disabled={running}>
             {running ? (
@@ -365,7 +365,7 @@ function UserClustering() {
                 </div>
                 <div className="col-6">
                   <div className="border rounded-3 p-3 text-center h-100">
-                    <div className="text-muted small fw-medium mb-1"><i className="bi bi-bounding-box me-1"></i>Davies\u2013Bouldin Index</div>
+                    <div className="text-muted small fw-medium mb-1"><i className="bi bi-bounding-box me-1"></i>Davies{'\u2013'}Bouldin Index</div>
                     <div className={`display-6 fw-bold ${data.metrics?.daviesBouldin != null && data.metrics?.daviesBouldin < 1 ? 'text-success' : 'text-warning'}`}>
                       {data.metrics?.daviesBouldin != null ? data.metrics.daviesBouldin.toFixed(4) : '\u2014'}
                     </div>
@@ -378,7 +378,7 @@ function UserClustering() {
                 </div>
               </div>
               <p className="text-muted small mb-0 mt-3">
-                Silhouette Score ranges from \u22121 to 1 (higher = clusters are well separated). The Davies\u2013Bouldin Index is lower-is-better (clusters are compact and far apart). K = {data.k ?? data.metrics?.k ?? '\u2014'}.
+                Silhouette Score ranges from {'\u2212'}1 to 1 (higher = clusters are well separated). The Davies{'\u2013'}Bouldin Index is lower-is-better (clusters are compact and far apart). K = {data.k ?? data.metrics?.k ?? '\u2014'}.
               </p>
             </div>
           </div>
