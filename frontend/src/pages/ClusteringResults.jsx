@@ -100,6 +100,9 @@ function ClusteringResults() {
           <span className={`badge ${running ? 'bg-info' : kValue ? 'bg-success' : 'bg-warning text-dark'} fs-6`}>
             {running ? <><span className="spinner-border spinner-border-sm me-1"></span>Running...</> : kValue ? <><i className="bi bi-check-circle me-1"></i>Completed</> : <><i className="bi bi-circle me-1"></i>Not Yet Run</>}
           </span>
+          <button className="btn btn-outline-secondary btn-sm" onClick={loadResults} disabled={loading || running} title="Refresh data">
+            <i className="bi bi-arrow-clockwise me-1"></i>Refresh
+          </button>
           <button className="btn btn-dark btn-sm" onClick={handleRunClustering} disabled={running}>
             {running ? (
               <><span className="spinner-border spinner-border-sm me-1"></span>Running...</>
@@ -175,7 +178,7 @@ function ClusteringResults() {
         </div>
       )}
 
-      {summary.length > 0 && (
+      {summary?.length > 0 && (
         <div className="card border-0 shadow-sm mb-4">
           <div className="card-header bg-white pt-4 px-4 border-bottom-0">
             <h6 className="fw-bold mb-0"><i className="bi bi-gear-wide-connected me-2"></i>Clustering Attributes</h6>
@@ -212,7 +215,7 @@ function ClusteringResults() {
         </div>
       )}
 
-      {summary.length > 0 && (
+      {summary?.length > 0 && (
         <div className="card border-0 shadow-sm mb-4">
           <div className="card-header bg-white pt-4 px-4 border-bottom-0">
             <h6 className="fw-bold mb-0"><i className="bi bi-table me-2"></i>Cluster Summary</h6>
@@ -249,7 +252,7 @@ function ClusteringResults() {
         </div>
       )}
 
-      {summary.length > 0 && (
+      {summary?.length > 0 && (
         <div className="card border-0 shadow-sm mb-4">
           <div className="card-header bg-white pt-4 px-4 border-bottom-0">
             <h6 className="fw-bold mb-0"><i className="bi bi-table me-2"></i>Cluster Statistics</h6>
@@ -293,7 +296,7 @@ function ClusteringResults() {
         </div>
       )}
 
-      {(!kValue && summary.length === 0 && newItems.length === 0) && (
+      {(!kValue && (summary?.length === 0 || !summary) && (newItems?.length === 0 || !newItems)) && (
         <div className="card border-0 shadow-sm mb-4">
           <div className="card-body text-center py-5">
             <i className="bi bi-diagram-3 text-muted" style={{ fontSize: '3rem' }}></i>
@@ -310,12 +313,12 @@ function ClusteringResults() {
         </div>
       )}
 
-      {newItems.length > 0 && (
+      {newItems?.length > 0 && (
         <div className="card border-0 shadow-sm mb-4">
           <div className="card-header bg-white pt-4 px-4 border-bottom-0">
             <h6 className="fw-bold mb-0">
               <i className="bi bi-plus-circle me-2"></i>New / Insufficient Data
-              <span className="badge bg-secondary ms-2">{newItems.length} items</span>
+              <span className="badge bg-secondary ms-2">{newItems?.length} items</span>
             </h6>
             <p className="text-muted small mb-0 mt-1">Recently added items with no usage history yet</p>
           </div>
@@ -332,7 +335,7 @@ function ClusteringResults() {
                 </tr>
               </thead>
               <tbody>
-                {newItems.map((item) => (
+                {newItems?.map((item) => (
                   <tr key={item._id}>
                     <td className="fw-medium">{item.title}</td>
                     <td className="text-muted">{item.author}</td>
