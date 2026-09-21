@@ -5,6 +5,8 @@ import BorrowModal from '../components/BorrowModal';
 import SimilarBooksModal from '../components/SimilarBooksModal';
 import { useToast } from '../components/Toast';
 
+const CLUSTER_COLORS = ['#6366f1', '#ec4899', '#10b981', '#f59e0b', '#3b82f6'];
+
 function CollectionItems() {
   const { addToast } = useToast();
   const [items, setItems] = useState([]);
@@ -165,7 +167,7 @@ function CollectionItems() {
                     <td><span className={`badge ${statusBadge(item.status)}`}>{item.status}</span></td>
                     <td>{item.usageMetrics.totalBorrows}</td>
                     <td>{item.usageMetrics.usageScore.toFixed(2)}</td>
-                    <td>{item.cluster === -2 ? <span className="badge bg-secondary">New</span> : (item.cluster === -1 ? <span className="badge bg-warning text-dark">Not Yet Clustered</span> : <span className="badge bg-success">Clustered</span>)}</td>
+                    <td>{item.cluster === -2 ? <span className="badge bg-secondary">New</span> : (item.cluster === -1 ? <span className="badge bg-warning text-dark">Not Yet Clustered</span> : <><span className="badge" style={{ backgroundColor: CLUSTER_COLORS[item.cluster % CLUSTER_COLORS.length] }}>Cluster {item.cluster}</span>{item.clusterLabel && <div className="text-muted" style={{ fontSize: '0.68rem' }}>{item.clusterLabel}</div>}</>)}</td>
                     <td>
                       <button className="btn btn-sm btn-outline-primary" onClick={() => openBorrowForm(item)}
                         disabled={item.copies < 1} title={item.copies < 1 ? 'No copies available' : 'Borrow this item'}>
@@ -356,7 +358,7 @@ function CollectionItems() {
                         <td><span className={`badge ${statusBadge(item.status)}`}>{item.status}</span></td>
                         <td>{item.usageMetrics.totalBorrows}</td>
                         <td>{item.usageMetrics.usageScore.toFixed(2)}</td>
-                        <td>{item.cluster === -2 ? <span className="badge bg-secondary">New</span> : (item.cluster === -1 ? <span className="badge bg-warning text-dark">Not Yet Clustered</span> : <span className="badge bg-success">Clustered</span>)}</td>
+                        <td>{item.cluster === -2 ? <span className="badge bg-secondary">New</span> : (item.cluster === -1 ? <span className="badge bg-warning text-dark">Not Yet Clustered</span> : <><span className="badge" style={{ backgroundColor: CLUSTER_COLORS[item.cluster % CLUSTER_COLORS.length] }}>Cluster {item.cluster}</span>{item.clusterLabel && <div className="text-muted" style={{ fontSize: '0.68rem' }}>{item.clusterLabel}</div>}</>)}</td>
                         <td>
                           <button className="btn btn-sm btn-outline-primary" onClick={() => openBorrowForm(item)}
                             disabled={item.copies < 1} title={item.copies < 1 ? 'No copies available' : 'Borrow this item'}>

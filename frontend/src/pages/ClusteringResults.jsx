@@ -226,7 +226,8 @@ function ClusteringResults() {
             <div className="mt-3">
               <small className="text-muted">
                 <strong>Total:</strong> 13 features (3 Usage Metrics + 10 TF-IDF Content Features)<br />
-                <strong>Normalization:</strong> Min-Max scaling to [0, 1] range
+                <strong>Normalization:</strong> Min-Max scaling to [0, 1] range<br />
+                <strong>Excluded:</strong> ISBN, Accession Number (unique identifiers — not used as clustering features)
               </small>
             </div>
           </div>
